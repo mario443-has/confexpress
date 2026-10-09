@@ -1,0 +1,56 @@
+body {
+  margin: 0;
+  font-family: system-ui, Arial, sans-serif;
+  background: #f5f6f8;
+  color: #1f2933;
+}
+.contenedor {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+.encabezado h1 {
+  margin: 0;
+  color: #1d3557;
+}
+.encabezado p {
+  margin: 4px 0 24px;
+  color: #52606d;
+}
+.rejilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+.tarjeta {
+  background: #fff;
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+.tarjeta h2 {
+  margin: 8px 0;
+  font-size: 1.1rem;
+}
+.categoria {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: #457b9d;
+  font-weight: 600;
+}
+.pie {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+}
+.etiqueta {
+  background: #e8f1f8;
+  color: #1d3557;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+}
+.error {
+  color: #b00020;
+}
