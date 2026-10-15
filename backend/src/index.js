@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { pool } from "./db.js";
 import productosRouter from "./routes/productos.js";
+import solicitudesRouter from "./routes/solicitudes.js";
 
 dotenv.config();
 
@@ -16,11 +17,12 @@ app.get("/api/salud", async (req, res) => {
     res.json({ ok: true, base_de_datos: "conectada" });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ ok: false, error: error.code || "Error de conexión" });
+    res.status(500).json({ ok: false, error: error.code || "Error de conexiÃ³n" });
   }
 });
 
 app.use("/api/productos", productosRouter);
+app.use("/api/solicitudes", solicitudesRouter);
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {

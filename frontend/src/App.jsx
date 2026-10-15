@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import FormularioSolicitud from "./FormularioSolicitud.jsx";
 
 const ETIQUETAS = {
   entrega_inmediata: "Entrega inmediata",
@@ -36,6 +37,7 @@ export default function App() {
         {productos.map((p) => (
           <article key={p.id} className="tarjeta">
             <span className="categoria">{p.categoria}</span>
+            {Boolean(p.destacado) && <span className="insignia">Destacado</span>}
             <h2>{p.nombre}</h2>
             <p>{p.descripcion}</p>
             <div className="pie">
@@ -49,6 +51,8 @@ export default function App() {
           </article>
         ))}
       </div>
+
+      <FormularioSolicitud productos={productos} />
     </div>
   );
 }

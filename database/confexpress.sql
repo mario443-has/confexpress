@@ -1,12 +1,16 @@
+-- ConfeXpress - esquema de base de datos del PMV
+-- Pensado para una instalacion NUEVA. No ejecutar sobre una base que ya tenga datos:
+-- CREATE TABLE IF NOT EXISTS no modifica tablas existentes.
+
 CREATE DATABASE IF NOT EXISTS confexpress
-CHARACTER SET utf8mb4
-COLLATE utf8mb4_unicode_ci;
+    CHARACTER SET utf8mb4
+    COLLATE utf8mb4_unicode_ci;
 
 USE confexpress;
 
--- 1. Productos y servicios del catalogo
+-- 1. Catalogo de productos y servicios
 CREATE TABLE IF NOT EXISTS productos (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(120) NOT NULL,
     descripcion TEXT,
     tipo ENUM('producto', 'servicio') NOT NULL,
@@ -18,23 +22,25 @@ CREATE TABLE IF NOT EXISTS productos (
         'requiere_consulta'
     ) NOT NULL DEFAULT 'requiere_consulta',
     activo BOOLEAN NOT NULL DEFAULT TRUE,
-    creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+    destacado BOOLEAN NOT NULL DEFAULT FALSE,
+    creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_producto_precio
+        CHECK (precio_referencia IS NULL OR precio_referencia >= 0)
+) ENGINE=InnoDB;
 
 -- 2. Datos de contacto de los clientes
 CREATE TABLE IF NOT EXISTS clientes (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(120) NOT NULL,
     telefono VARCHAR(25) NOT NULL,
-    correo VARCHAR(120),
-    creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+    correo VARCHAR(120) NULL,
+    creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
 
--- 3. Solicitudes realizadas por los clientes
--- La aceptacion o rechazo vive en la cotizacion, no aqui.
+-- 3. Solicitudes enviadas por los clientes
 CREATE TABLE IF NOT EXISTS solicitudes (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    cliente_id INT NOT NULL,
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    cliente_id INT UNSIGNED NOT NULL,
     estado ENUM(
         'recibida',
         'en_revision',
@@ -42,31 +48,55 @@ CREATE TABLE IF NOT EXISTS solicitudes (
         'cancelada'
     ) NOT NULL DEFAULT 'recibida',
     observaciones TEXT,
-    creada_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (cliente_id)
-        REFERENCES clientes(id)
-);
+    -- Momento en que el cliente autorizo el tratamiento de sus datos personales
+    autorizacion_datos_en TIMESTAMP NULL,
+    creada_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
--- 4. Productos o servicios incluidos en cada solicitud
+    INDEX idx_solicitudes_cliente (cliente_id),
+    INDEX idx_solicitudes_estado (estado),
+
+    CONSTRAINT fk_solicitudes_cliente
+        FOREIGN KEY (cliente_id)
+        REFERENCES clientes(id)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE
+) ENGINE=InnoDB;
+
+-- 4. Productos o servicios solicitados
 CREATE TABLE IF NOT EXISTS detalles_solicitud (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    solicitud_id INT NOT NULL,
-    producto_id INT NULL,
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    solicitud_id INT UNSIGNED NOT NULL,
+    producto_id INT UNSIGNED NULL,
     descripcion_solicitada VARCHAR(200) NOT NULL,
     cantidad INT UNSIGNED NOT NULL DEFAULT 1,
-    talla VARCHAR(50),
+    talla VARCHAR(50) NULL,
+    -- Para trabajos por encargo el cliente describe aqui su diseno.
+    -- Las medidas y los materiales se definen en persona, no en el sistema.
     especificaciones TEXT,
-    FOREIGN KEY (solicitud_id)
-        REFERENCES solicitudes(id),
-    FOREIGN KEY (producto_id)
+
+    INDEX idx_detalles_solicitud (solicitud_id),
+    INDEX idx_detalles_producto (producto_id),
+
+    CONSTRAINT chk_detalle_cantidad
+        CHECK (cantidad > 0),
+
+    CONSTRAINT fk_detalle_solicitud
+        FOREIGN KEY (solicitud_id)
+        REFERENCES solicitudes(id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+
+    CONSTRAINT fk_detalle_producto
+        FOREIGN KEY (producto_id)
         REFERENCES productos(id)
         ON DELETE SET NULL
-);
+        ON UPDATE CASCADE
+) ENGINE=InnoDB;
 
--- 5. Cotizaciones asociadas a las solicitudes
+-- 5. Cotizacion de cada solicitud (una por solicitud en el PMV)
 CREATE TABLE IF NOT EXISTS cotizaciones (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    solicitud_id INT NOT NULL,
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    solicitud_id INT UNSIGNED NOT NULL UNIQUE,
     estado ENUM(
         'borrador',
         'enviada',
@@ -74,29 +104,45 @@ CREATE TABLE IF NOT EXISTS cotizaciones (
         'rechazada',
         'vencida'
     ) NOT NULL DEFAULT 'borrador',
-    fecha_emision TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    fecha_emision TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     fecha_vencimiento DATE NULL,
     observaciones TEXT,
-    FOREIGN KEY (solicitud_id)
-        REFERENCES solicitudes(id)
-);
 
--- 6. Conceptos y valores de cada cotizacion
+    CONSTRAINT fk_cotizacion_solicitud
+        FOREIGN KEY (solicitud_id)
+        REFERENCES solicitudes(id)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE
+) ENGINE=InnoDB;
+
+-- 6. Conceptos y valores incluidos en la cotizacion
 CREATE TABLE IF NOT EXISTS detalles_cotizacion (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    cotizacion_id INT NOT NULL,
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    cotizacion_id INT UNSIGNED NOT NULL,
     descripcion VARCHAR(200) NOT NULL,
     cantidad INT UNSIGNED NOT NULL DEFAULT 1,
     precio_unitario DECIMAL(12,2) NOT NULL,
-    FOREIGN KEY (cotizacion_id)
+
+    INDEX idx_detalles_cotizacion (cotizacion_id),
+
+    CONSTRAINT chk_cotizacion_cantidad
+        CHECK (cantidad > 0),
+
+    CONSTRAINT chk_cotizacion_precio
+        CHECK (precio_unitario >= 0),
+
+    CONSTRAINT fk_detalle_cotizacion
+        FOREIGN KEY (cotizacion_id)
         REFERENCES cotizaciones(id)
         ON DELETE CASCADE
-);
+        ON UPDATE CASCADE
+) ENGINE=InnoDB;
 
--- 7. Pedidos: nacen de una cotizacion aceptada
+-- 7. Pedidos generados a partir de cotizaciones aceptadas
+-- El backend debe verificar que la cotizacion este aceptada antes de crear el pedido.
 CREATE TABLE IF NOT EXISTS pedidos (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    cotizacion_id INT NOT NULL UNIQUE,
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    cotizacion_id INT UNSIGNED NOT NULL UNIQUE,
     estado ENUM(
         'confirmado',
         'en_confeccion',
@@ -105,20 +151,48 @@ CREATE TABLE IF NOT EXISTS pedidos (
         'cancelado'
     ) NOT NULL DEFAULT 'confirmado',
     fecha_entrega_estimada DATE NULL,
+    fecha_entrega_real DATE NULL,
     observaciones TEXT,
-    creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (cotizacion_id)
-        REFERENCES cotizaciones(id)
-);
+    creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
--- Productos y servicios iniciales de DEMOSTRACION.
--- No son un catalogo verificado; reemplazar por los reales de E&M.
+    CONSTRAINT fk_pedido_cotizacion
+        FOREIGN KEY (cotizacion_id)
+        REFERENCES cotizaciones(id)
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE
+) ENGINE=InnoDB;
+
+-- 8. Galeria de fotos de trabajos realizados
+-- ruta_imagen guarda la ruta del archivo (por ejemplo /uploads/galeria/foto1.jpg).
+-- producto_id es opcional: una foto puede ser de un producto o general.
+CREATE TABLE IF NOT EXISTS galeria_imagenes (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    producto_id INT UNSIGNED NULL,
+    titulo VARCHAR(120) NOT NULL,
+    descripcion VARCHAR(255) NULL,
+    ruta_imagen VARCHAR(255) NOT NULL,
+    orden INT NOT NULL DEFAULT 0,
+    activo BOOLEAN NOT NULL DEFAULT TRUE,
+    creado_en TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    INDEX idx_galeria_producto (producto_id),
+
+    CONSTRAINT fk_galeria_producto
+        FOREIGN KEY (producto_id)
+        REFERENCES productos(id)
+        ON DELETE SET NULL
+        ON UPDATE CASCADE
+) ENGINE=InnoDB;
+
+-- Datos iniciales de DEMOSTRACION.
+-- No son un catalogo verificado ni tienen precios reales.
+-- La descripcion de "Uniformes pijameros" queda vacia hasta que se redacte la real.
 INSERT INTO productos
     (nombre, descripcion, tipo, categoria, precio_referencia, modalidad)
 VALUES
     (
         'Uniformes escolares',
-        'Prendas escolares confeccionadas segun las especificaciones del cliente.',
+        'Prendas escolares confeccionadas segun los requerimientos del cliente.',
         'producto',
         'Uniformes escolares',
         NULL,
@@ -126,7 +200,7 @@ VALUES
     ),
     (
         'Sudaderas deportivas',
-        'Conjuntos deportivos con caracteristicas y cantidades por definir.',
+        'Conjuntos deportivos cuyo precio depende de las especificaciones.',
         'producto',
         'Uniformes deportivos',
         NULL,
@@ -134,7 +208,7 @@ VALUES
     ),
     (
         'Dotaciones institucionales',
-        'Prendas para empresas e instituciones, sujetas a cotizacion.',
+        'Prendas para empresas e instituciones sujetas a cotizacion.',
         'producto',
         'Dotaciones',
         NULL,
@@ -142,9 +216,21 @@ VALUES
     ),
     (
         'Arreglos de prendas',
-        'Ajustes y modificaciones de prendas segun el trabajo solicitado.',
+        'Ajustes y modificaciones cuyo valor depende del trabajo solicitado.',
         'servicio',
         'Arreglos',
         NULL,
         'requiere_consulta'
+    ),
+    (
+        'Uniformes pijameros',
+        NULL,
+        'producto',
+        'Uniformes pijameros',
+        NULL,
+        'por_encargo'
     );
+
+-- Producto destacado en el catalogo
+UPDATE productos SET destacado = TRUE WHERE nombre = 'Uniformes pijameros' AND id > 0;
+
