@@ -41,7 +41,7 @@ export default function App() {
             <h2>{p.nombre}</h2>
             <p>{p.descripcion}</p>
             <div className="pie">
-              <span className="etiqueta">{ETIQUETAS[p.modalidad]}</span>
+              <span className="etiqueta">{ETIQUETAS[p.modalidad]}{Boolean(p.a_medida) && " · A la medida"}</span>
               <strong>
                 {p.precio_referencia === null
                   ? "Consultar precio"

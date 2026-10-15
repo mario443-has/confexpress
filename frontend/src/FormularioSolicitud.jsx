@@ -18,9 +18,9 @@ export default function FormularioSolicitud({ productos }) {
   const [error, setError] = useState("");
   const [exito, setExito] = useState(null);
 
-  const hayPorEncargo = items.some((it) => {
+  const hayAMedida = items.some((it) => {
     const p = productos.find((x) => String(x.id) === String(it.producto_id));
-    return p && p.modalidad === "por_encargo";
+    return p && Boolean(p.a_medida);
   });
 
   function cambiarCliente(campo, valor) {
@@ -163,7 +163,7 @@ export default function FormularioSolicitud({ productos }) {
                 />
               </div>
               <div className="grupo">
-                <label>Talla</label>
+                <label>Talla (uniformes escolares)</label>
                 <input
                   value={it.talla}
                   onChange={(e) => cambiarItem(i, "talla", e.target.value)}
@@ -186,9 +186,9 @@ export default function FormularioSolicitud({ productos }) {
           </div>
         ))}
 
-        {hayPorEncargo && (
+        {hayAMedida && (
           <p className="aviso">
-            Los trabajos por encargo se confeccionan a la medida. Las medidas y los materiales se
+            Este trabajo se confecciona a la medida. Las medidas y los materiales se
             definen en persona; cuéntanos tu diseño y te contactaremos para coordinarlo.
           </p>
         )}

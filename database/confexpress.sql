@@ -232,5 +232,4 @@ VALUES
     );
 
 -- Producto destacado en el catalogo
-UPDATE productos SET destacado = TRUE WHERE nombre = 'Uniformes pijameros' AND id > 0;
-
+UPDATE productos SET destacado = TRUE WHERE nombre = 'Uniformes pijameros';
