@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { pool } from "../db.js";
 import { crearToken, requireAdmin, verificarPassword } from "../auth.js";
+import { validar, crearSolicitud, errorHttp } from "../solicitudesServicio.js";
+import medidasRouter from "./medidas.js";
 
 const router = Router();
 
@@ -24,7 +26,7 @@ router.use(requireAdmin);
 router.get("/solicitudes", async (req, res) => {
   try {
     const [filas] = await pool.query(
-      `SELECT s.id, s.estado, s.creada_en, c.nombre AS cliente, c.telefono,
+      `SELECT s.id, s.estado, s.origen, s.creada_en, c.nombre AS cliente, c.telefono,
               (SELECT COUNT(*) FROM detalles_solicitud d WHERE d.solicitud_id = s.id) AS items
        FROM solicitudes s
        JOIN clientes c ON c.id = s.cliente_id
@@ -44,7 +46,7 @@ router.get("/solicitudes/:id", async (req, res) => {
   }
   try {
     const [filas] = await pool.query(
-      `SELECT s.id, s.estado, s.observaciones, s.autorizacion_datos_en, s.creada_en,
+      `SELECT s.id, s.estado, s.origen, s.observaciones, s.autorizacion_datos_en, s.creada_en,
               c.id AS cliente_id, c.nombre AS cliente, c.telefono, c.correo
        FROM solicitudes s
        JOIN clientes c ON c.id = s.cliente_id
@@ -96,6 +98,25 @@ router.patch("/solicitudes/:id/estado", async (req, res) => {
     res.status(500).json({ error: "No se pudo actualizar el estado." });
   }
 });
+
+router.post("/solicitudes", async (req, res) => {
+  const origen = req.body?.origen;
+  if (!["presencial", "whatsapp"].includes(origen)) {
+    return res.status(400).json({ error: "Origen no válido." });
+  }
+  const { error, datos } = validar(req.body || {});
+  if (error) return res.status(400).json({ error });
+
+  try {
+    const id = await crearSolicitud(datos, origen);
+    res.status(201).json({ id });
+  } catch (e) {
+    const { estado, mensaje } = errorHttp(e);
+    res.status(estado).json({ error: mensaje });
+  }
+});
+
+router.use(medidasRouter);
 
 router.get("/clientes", async (req, res) => {
   try {

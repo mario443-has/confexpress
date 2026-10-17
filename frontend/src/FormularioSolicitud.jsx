@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { NOMBRE_NEGOCIO, WHATSAPP_NUMERO } from "./config.js";
+import { obtenerToken } from "./api.js";
 
 const ITEM_VACIO = {
   producto_id: "",
@@ -9,7 +10,13 @@ const ITEM_VACIO = {
   especificaciones: "",
 };
 
-export default function FormularioSolicitud({ productos }) {
+export default function FormularioSolicitud({ productos, modoAdmin = false }) {
+  const [origen, setOrigen] = useState("presencial");
+  const endpoint = modoAdmin ? "/api/admin/solicitudes" : "/api/solicitudes";
+  const encabezados = {
+    "Content-Type": "application/json",
+    ...(modoAdmin ? { Authorization: `Bearer ${obtenerToken() ?? ""}` } : {}),
+  };
   const [cliente, setCliente] = useState({ nombre: "", telefono: "", correo: "" });
   const [observaciones, setObservaciones] = useState("");
   const [items, setItems] = useState([{ ...ITEM_VACIO }]);
@@ -56,13 +63,14 @@ export default function FormularioSolicitud({ productos }) {
     setExito(null);
     setEnviando(true);
     try {
-      const res = await fetch("/api/solicitudes", {
+      const res = await fetch(endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: encabezados,
         body: JSON.stringify({
           ...cliente,
           observaciones,
           autoriza_datos: autoriza,
+          ...(modoAdmin ? { origen } : {}),
           items: items.map((it) => ({
             ...it,
             producto_id: it.producto_id ? Number(it.producto_id) : null,
@@ -92,8 +100,8 @@ export default function FormularioSolicitud({ productos }) {
 
   return (
     <section className="formulario">
-      <h2>Solicitar cotización</h2>
-      <p className="ayuda">
+      <h2>{modoAdmin ? "Registrar solicitud (cliente en el local o por WhatsApp)" : "Solicitar cotización"}</h2>
+      <p className="ayuda" hidden={modoAdmin}>
         Cuéntanos qué necesitas. El negocio revisará tu solicitud y te contactará con la cotización.
       </p>
 
@@ -206,6 +214,15 @@ export default function FormularioSolicitud({ productos }) {
           />
         </div>
 
+        {modoAdmin && (
+          <div className="grupo">
+            <label>¿Cómo llegó este cliente?</label>
+            <select value={origen} onChange={(e) => setOrigen(e.target.value)}>
+              <option value="presencial">En el local</option>
+              <option value="whatsapp">Por WhatsApp</option>
+            </select>
+          </div>
+        )}
         <label className="autorizacion">
           <input
             type="checkbox"
@@ -214,7 +231,7 @@ export default function FormularioSolicitud({ productos }) {
             required
           />
           <span>
-            Autorizo a {NOMBRE_NEGOCIO} el tratamiento de mis datos personales (nombre, teléfono y
+            {modoAdmin ? "El cliente autoriza a " : "Autorizo a "}{NOMBRE_NEGOCIO} el tratamiento de {modoAdmin ? "sus" : "mis"} datos personales (nombre, teléfono y
             correo) para gestionar esta solicitud. *
           </span>
         </label>
@@ -222,7 +239,9 @@ export default function FormularioSolicitud({ productos }) {
         {error && <p className="error">{error}</p>}
         {exito && (
           <p className="exito">
-            Solicitud #{exito} enviada. El negocio la revisará y te contactará.
+            {modoAdmin
+              ? `Solicitud #${exito} registrada.`
+              : `Solicitud #${exito} enviada. El negocio la revisará y te contactará.`}
           </p>
         )}
 
@@ -230,7 +249,7 @@ export default function FormularioSolicitud({ productos }) {
           <button type="submit" disabled={enviando}>
             {enviando ? "Enviando..." : "Enviar solicitud"}
           </button>
-          {enlaceWhatsApp && (
+          {enlaceWhatsApp && !modoAdmin && (
             <a className="boton-whatsapp" href={enlaceWhatsApp} target="_blank" rel="noreferrer">
               Hablar por WhatsApp
             </a>

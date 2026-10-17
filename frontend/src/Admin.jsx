@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { borrarToken, guardarToken, llamarAdmin, obtenerToken } from "./api.js";
+import FormularioSolicitud from "./FormularioSolicitud.jsx";
 
 const ESTADOS = {
   recibida: "Recibida",
@@ -8,6 +9,7 @@ const ESTADOS = {
   cancelada: "Cancelada",
 };
 const ESTADOS_MANUALES = ["recibida", "en_revision", "cancelada"];
+const ORIGENES = { web: "Web", presencial: "En el local", whatsapp: "WhatsApp" };
 
 function fecha(valor) {
   return valor ? new Date(valor).toLocaleString("es-CO") : "—";
@@ -102,6 +104,7 @@ function ListaSolicitudes({ alAbrir, alExpirar }) {
             <th>Cliente</th>
             <th>Teléfono</th>
             <th>Ítems</th>
+            <th>Origen</th>
             <th>Estado</th>
             <th></th>
           </tr>
@@ -114,6 +117,7 @@ function ListaSolicitudes({ alAbrir, alExpirar }) {
               <td>{s.cliente}</td>
               <td>{s.telefono}</td>
               <td>{s.items}</td>
+              <td>{ORIGENES[s.origen]}</td>
               <td>
                 <span className={`estado estado-${s.estado}`}>{ESTADOS[s.estado]}</span>
               </td>
@@ -171,7 +175,8 @@ function DetalleSolicitud({ id, alVolver, alExpirar }) {
             )}
           </p>
           <p>
-            <strong>Recibida:</strong> {fecha(datos.creada_en)} ·{" "}
+            <strong>Recibida:</strong> {fecha(datos.creada_en)} · <strong>Origen:</strong>{" "}
+            {ORIGENES[datos.origen]} ·{" "}
             <strong>Autorizó el tratamiento de datos:</strong>{" "}
             {datos.autorizacion_datos_en ? fecha(datos.autorizacion_datos_en) : "Sin registro"}
           </p>
@@ -210,6 +215,17 @@ function DetalleSolicitud({ id, alVolver, alExpirar }) {
             </table>
           </div>
 
+          {datos.items.some((it) => it.a_medida) && (
+            <>
+              <h3>Medidas (en centímetros)</h3>
+              {datos.items
+                .filter((it) => it.a_medida)
+                .map((it) => (
+                  <MedidasItem key={it.id} item={it} alExpirar={alExpirar} />
+                ))}
+            </>
+          )}
+
           <h3>Cambiar estado</h3>
           <div className="acciones">
             {ESTADOS_MANUALES.map((e) => (
@@ -225,6 +241,116 @@ function DetalleSolicitud({ id, alVolver, alExpirar }) {
           </div>
           {mensaje && <p className="error">{mensaje}</p>}
         </section>
+      )}
+    </div>
+  );
+}
+
+function MedidasItem({ item, alExpirar }) {
+  const { datos, error } = useAdmin(`/items/${item.id}/medidas`, alExpirar);
+  const [tipos, setTipos] = useState([]);
+  const [valores, setValores] = useState({});
+  const [mensaje, setMensaje] = useState("");
+  const [guardando, setGuardando] = useState(false);
+
+  useEffect(() => {
+    if (!datos) return;
+    setTipos(datos.tipos);
+    setValores(datos.valores);
+  }, [datos]);
+
+  if (error) return <p className="error">{error}</p>;
+  if (!datos) return <p>Cargando medidas...</p>;
+
+  const catalogoPorId = Object.fromEntries(datos.catalogo.map((t) => [t.id, t]));
+  const disponibles = datos.catalogo.filter((t) => !tipos.includes(t.id));
+
+  async function guardar() {
+    setMensaje("");
+    setGuardando(true);
+    try {
+      const prendas = tipos.map((tipoId) => ({
+        tipo_prenda_id: tipoId,
+        medidas: catalogoPorId[tipoId].medidas
+          .map((m) => ({ medida_id: m.id, valor: valores[`${tipoId}-${m.id}`] }))
+          .filter((m) => m.valor !== undefined && String(m.valor).trim() !== ""),
+      }));
+      await llamarAdmin(`/items/${item.id}/medidas`, {
+        method: "PUT",
+        body: JSON.stringify({ prendas }),
+      });
+      setMensaje("Medidas guardadas.");
+    } catch (e) {
+      if (e.estado === 401) alExpirar();
+      else setMensaje(e.message);
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <div className="medidas-item">
+      <h4>
+        {item.descripcion_solicitada} · cantidad {item.cantidad}
+      </h4>
+      {item.cantidad > 1 && (
+        <p className="nota">
+          Un juego de medidas sirve para una sola persona. Si son varias personas, registra cada
+          una como un ítem aparte.
+        </p>
+      )}
+      {tipos.map((tipoId) => {
+        const tipo = catalogoPorId[tipoId];
+        return (
+          <fieldset key={tipoId} className="prenda">
+            <legend>{tipo.nombre}</legend>
+            <div className="medidas-rejilla">
+              {tipo.medidas.map((m) => (
+                <label key={m.id}>
+                  {m.nombre}
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={valores[`${tipoId}-${m.id}`] ?? ""}
+                    onChange={(e) =>
+                      setValores({ ...valores, [`${tipoId}-${m.id}`]: e.target.value })
+                    }
+                  />
+                </label>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="secundario"
+              onClick={() => setTipos(tipos.filter((t) => t !== tipoId))}
+            >
+              Quitar {tipo.nombre.toLowerCase()}
+            </button>
+          </fieldset>
+        );
+      })}
+      {disponibles.length > 0 && (
+        <select
+          value=""
+          onChange={(e) => e.target.value && setTipos([...tipos, Number(e.target.value)])}
+        >
+          <option value="">+ Agregar prenda...</option>
+          {disponibles.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.nombre}
+            </option>
+          ))}
+        </select>
+      )}
+      <div className="acciones">
+        <button type="button" onClick={guardar} disabled={guardando}>
+          {guardando ? "Guardando..." : "Guardar medidas"}
+        </button>
+      </div>
+      {mensaje && (
+        <p className={mensaje === "Medidas guardadas." ? "" : "error"} style={mensaje === "Medidas guardadas." ? { color: "#1b7f3b" } : undefined}>
+          {mensaje}
+        </p>
       )}
     </div>
   );
@@ -266,6 +392,17 @@ function ListaClientes({ alExpirar }) {
   );
 }
 
+function NuevaSolicitud() {
+  const [productos, setProductos] = useState([]);
+  useEffect(() => {
+    fetch("/api/productos")
+      .then((r) => r.json())
+      .then(setProductos)
+      .catch(() => {});
+  }, []);
+  return <FormularioSolicitud productos={productos} modoAdmin />;
+}
+
 export default function Admin() {
   const [autenticado, setAutenticado] = useState(Boolean(obtenerToken()));
   const [pestana, setPestana] = useState("solicitudes");
@@ -304,6 +441,12 @@ export default function Admin() {
         >
           Clientes
         </button>
+      <button
+          className={pestana === "nueva" ? "activa" : ""}
+          onClick={() => setPestana("nueva")}
+        >
+          Nueva solicitud
+        </button>
       </nav>
 
       {pestana === "solicitudes" && abierta === null && (
@@ -313,6 +456,7 @@ export default function Admin() {
         <DetalleSolicitud id={abierta} alVolver={() => setAbierta(null)} alExpirar={salir} />
       )}
       {pestana === "clientes" && <ListaClientes alExpirar={salir} />}
+      {pestana === "nueva" && <NuevaSolicitud />}
     </div>
   );
 }
