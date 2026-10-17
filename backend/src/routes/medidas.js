@@ -28,6 +28,23 @@ async function cargarCatalogo() {
   }));
 }
 
+router.get("/medidas/catalogo", async (req, res) => {
+  try {
+    const catalogo = await cargarCatalogo();
+    const [filas] = await pool.query(
+      "SELECT producto_id, tipo_prenda_id FROM producto_prendas ORDER BY producto_id, tipo_prenda_id"
+    );
+    const precargas = {};
+    for (const f of filas) {
+      (precargas[f.producto_id] ??= []).push(f.tipo_prenda_id);
+    }
+    res.json({ catalogo, precargas });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "No se pudo cargar el catálogo de medidas." });
+  }
+});
+
 router.get("/items/:id/medidas", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id < 1) {

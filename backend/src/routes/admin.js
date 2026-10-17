@@ -104,7 +104,7 @@ router.post("/solicitudes", async (req, res) => {
   if (!["presencial", "whatsapp"].includes(origen)) {
     return res.status(400).json({ error: "Origen no válido." });
   }
-  const { error, datos } = validar(req.body || {});
+  const { error, datos } = validar(req.body || {}, { permitirMedidas: true });
   if (error) return res.status(400).json({ error });
 
   try {

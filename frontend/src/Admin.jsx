@@ -394,13 +394,19 @@ function ListaClientes({ alExpirar }) {
 
 function NuevaSolicitud() {
   const [productos, setProductos] = useState([]);
+  const [medidas, setMedidas] = useState(null);
+  useEffect(() => {
+    llamarAdmin("/medidas/catalogo")
+      .then(setMedidas)
+      .catch(() => {});
+  }, []);
   useEffect(() => {
     fetch("/api/productos")
       .then((r) => r.json())
       .then(setProductos)
       .catch(() => {});
   }, []);
-  return <FormularioSolicitud productos={productos} modoAdmin />;
+  return <FormularioSolicitud productos={productos} modoAdmin medidas={medidas} />;
 }
 
 export default function Admin() {

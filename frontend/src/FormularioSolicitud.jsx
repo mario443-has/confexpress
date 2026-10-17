@@ -1,8 +1,11 @@
 import { useState } from "react";
 import { NOMBRE_NEGOCIO, WHATSAPP_NUMERO } from "./config.js";
 import { obtenerToken } from "./api.js";
+import EditorMedidas from "./EditorMedidas.jsx";
 
 const ITEM_VACIO = {
+  tipos: [],
+  valores: {},
   producto_id: "",
   descripcion: "",
   cantidad: 1,
@@ -10,8 +13,21 @@ const ITEM_VACIO = {
   especificaciones: "",
 };
 
-export default function FormularioSolicitud({ productos, modoAdmin = false }) {
+export default function FormularioSolicitud({ productos, modoAdmin = false, medidas = null }) {
   const [origen, setOrigen] = useState("presencial");
+
+  function prendasDelItem(it) {
+    if (!medidas) return [];
+    return it.tipos.map((tipoId) => {
+      const tipo = medidas.catalogo.find((t) => t.id === tipoId);
+      return {
+        tipo_prenda_id: tipoId,
+        medidas: (tipo ? tipo.medidas : [])
+          .map((m) => ({ medida_id: m.id, valor: it.valores[`${tipoId}-${m.id}`] }))
+          .filter((m) => m.valor !== undefined && String(m.valor).trim() !== ""),
+      };
+    });
+  }
   const endpoint = modoAdmin ? "/api/admin/solicitudes" : "/api/solicitudes";
   const encabezados = {
     "Content-Type": "application/json",
@@ -44,7 +60,11 @@ export default function FormularioSolicitud({ productos, modoAdmin = false }) {
       items.map((it, i) => {
         if (i !== indice) return it;
         const descripcion = !it.descripcion && producto ? producto.nombre : it.descripcion;
-        return { ...it, producto_id: id, descripcion };
+        const tipos =
+          modoAdmin && producto && producto.a_medida && medidas
+            ? medidas.precargas[producto.id] ?? []
+            : [];
+        return { ...it, producto_id: id, descripcion, tipos, valores: {} };
       })
     );
   }
@@ -75,6 +95,7 @@ export default function FormularioSolicitud({ productos, modoAdmin = false }) {
             ...it,
             producto_id: it.producto_id ? Number(it.producto_id) : null,
             cantidad: Number(it.cantidad),
+            ...(modoAdmin ? { prendas: prendasDelItem(it) } : {}),
           })),
         }),
       });
@@ -186,6 +207,18 @@ export default function FormularioSolicitud({ productos, modoAdmin = false }) {
                 onChange={(e) => cambiarItem(i, "especificaciones", e.target.value)}
               />
             </div>
+            {modoAdmin &&
+              medidas &&
+              productos.some((p) => String(p.id) === String(it.producto_id) && p.a_medida) && (
+                <EditorMedidas
+                  catalogo={medidas.catalogo}
+                  tipos={it.tipos}
+                  valores={it.valores}
+                  cantidad={Number(it.cantidad)}
+                  alCambiarTipos={(t) => cambiarItem(i, "tipos", t)}
+                  alCambiarValores={(v) => cambiarItem(i, "valores", v)}
+                />
+              )}
             {items.length > 1 && (
               <button type="button" className="secundario" onClick={() => quitarItem(i)}>
                 Quitar este ítem
@@ -194,7 +227,7 @@ export default function FormularioSolicitud({ productos, modoAdmin = false }) {
           </div>
         ))}
 
-        {hayAMedida && (
+        {hayAMedida && !modoAdmin && (
           <p className="aviso">
             Este trabajo se confecciona a la medida. Las medidas y los materiales se
             definen en persona; cuéntanos tu diseño y te contactaremos para coordinarlo.
