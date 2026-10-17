@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import FormularioSolicitud from "./FormularioSolicitud.jsx";
+import Admin from "./Admin.jsx";
 
 const ETIQUETAS = {
   entrega_inmediata: "Entrega inmediata",
@@ -7,7 +8,7 @@ const ETIQUETAS = {
   requiere_consulta: "Requiere consulta",
 };
 
-export default function App() {
+function Catalogo() {
   const [productos, setProductos] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
@@ -41,7 +42,10 @@ export default function App() {
             <h2>{p.nombre}</h2>
             <p>{p.descripcion}</p>
             <div className="pie">
-              <span className="etiqueta">{ETIQUETAS[p.modalidad]}{Boolean(p.a_medida) && " · A la medida"}</span>
+              <span className="etiqueta">
+                {ETIQUETAS[p.modalidad]}
+                {Boolean(p.a_medida) && " · A la medida"}
+              </span>
               <strong>
                 {p.precio_referencia === null
                   ? "Consultar precio"
@@ -55,4 +59,20 @@ export default function App() {
       <FormularioSolicitud productos={productos} />
     </div>
   );
+}
+
+function esAdmin() {
+  return window.location.hash.startsWith("#/admin");
+}
+
+export default function App() {
+  const [admin, setAdmin] = useState(esAdmin());
+
+  useEffect(() => {
+    const alCambiar = () => setAdmin(esAdmin());
+    window.addEventListener("hashchange", alCambiar);
+    return () => window.removeEventListener("hashchange", alCambiar);
+  }, []);
+
+  return admin ? <Admin /> : <Catalogo />;
 }
