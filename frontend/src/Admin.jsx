@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { borrarToken, guardarToken, llamarAdmin, obtenerToken } from "./api.js";
 import FormularioSolicitud from "./FormularioSolicitud.jsx";
+import { NOMBRE_NEGOCIO } from "./config.js";
 
 const ESTADOS = {
   recibida: "Recibida",
@@ -226,6 +227,9 @@ function DetalleSolicitud({ id, alVolver, alExpirar }) {
             </>
           )}
 
+          <h3>Cotización</h3>
+          <Cotizaciones solicitud={datos} alExpirar={alExpirar} alCambiar={recargar} />
+
           <h3>Cambiar estado</h3>
           <div className="acciones">
             {ESTADOS_MANUALES.map((e) => (
@@ -351,6 +355,258 @@ function MedidasItem({ item, alExpirar }) {
         <p className={mensaje === "Medidas guardadas." ? "" : "error"} style={mensaje === "Medidas guardadas." ? { color: "#1b7f3b" } : undefined}>
           {mensaje}
         </p>
+      )}
+    </div>
+  );
+}
+
+const ESTADOS_COTIZACION = {
+  borrador: "Borrador",
+  enviada: "Enviada",
+  aceptada: "Aceptada",
+  rechazada: "Rechazada",
+};
+
+function dinero(valor) {
+  return Number(valor).toLocaleString("es-CO", {
+    style: "currency",
+    currency: "COP",
+    maximumFractionDigits: 0,
+  });
+}
+
+function soloDigitos(texto) {
+  return texto.replace(/\D/g, "");
+}
+
+function numeroInternacional(telefono) {
+  let d = String(telefono).replace(/\D/g, "");
+  if (d.startsWith("00")) d = d.slice(2);
+  if (d.length === 10 && d.startsWith("3")) return `57${d}`;
+  if (d.length === 10 && d.startsWith("09")) return `593${d.slice(1)}`;
+  if (d.length === 9 && d.startsWith("9")) return `593${d}`;
+  return d;
+}
+
+function enlaceWhatsApp(solicitud, cotizacion) {
+  const numero = numeroInternacional(solicitud.telefono);
+  const nombre = String(solicitud.cliente).trim().split(" ")[0];
+  const detalle = cotizacion.lineas
+    .map((l) => `- ${l.cantidad} x ${l.descripcion} (${dinero(l.precio_unitario)} c/u)`)
+    .join("\n");
+  const vence = cotizacion.fecha_vencimiento
+    ? new Date(cotizacion.fecha_vencimiento).toLocaleDateString("es-CO")
+    : null;
+  const texto =
+    `Hola ${nombre}, esta es tu cotización de ${NOMBRE_NEGOCIO}:\n${detalle}\n` +
+    `Total: ${dinero(cotizacion.total)}` +
+    (vence ? `\nVálida hasta el ${vence}.` : "");
+  return `https://wa.me/${numero}?text=${encodeURIComponent(texto)}`;
+}
+
+function Cotizaciones({ solicitud, alExpirar, alCambiar }) {
+  const { datos, error, recargar } = useAdmin(
+    `/solicitudes/${solicitud.id}/cotizaciones`,
+    alExpirar
+  );
+  const [lineas, setLineas] = useState(() =>
+    solicitud.items.map((it) => ({
+      detalle_solicitud_id: it.id,
+      descripcion: it.descripcion_solicitada,
+      cantidad: String(it.cantidad),
+      precio: "",
+    }))
+  );
+  const [dias, setDias] = useState("15");
+  const [observaciones, setObservaciones] = useState("");
+  const [mensaje, setMensaje] = useState("");
+  const [guardando, setGuardando] = useState(false);
+
+  const total = lineas.reduce(
+    (suma, l) => suma + (Number(l.cantidad) || 0) * (Number(l.precio) || 0),
+    0
+  );
+
+  function cambiar(indice, campo, valor) {
+    setLineas(lineas.map((l, i) => (i === indice ? { ...l, [campo]: valor } : l)));
+  }
+
+  async function crear() {
+    setMensaje("");
+    setGuardando(true);
+    try {
+      await llamarAdmin(`/solicitudes/${solicitud.id}/cotizaciones`, {
+        method: "POST",
+        body: JSON.stringify({
+          lineas: lineas.map((l) => ({
+            detalle_solicitud_id: l.detalle_solicitud_id,
+            descripcion: l.descripcion,
+            cantidad: Number(l.cantidad),
+            precio_unitario: Number(l.precio),
+          })),
+          dias_validez: Number(dias),
+          observaciones,
+        }),
+      });
+      setMensaje("Cotización creada.");
+      recargar();
+      alCambiar();
+    } catch (e) {
+      if (e.estado === 401) alExpirar();
+      else setMensaje(e.message);
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <div>
+      {error && <p className="error">{error}</p>}
+      {datos && datos.length > 0 && (
+        <div className="tabla-contenedor" style={{ marginBottom: 16 }}>
+          <table className="tabla">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Estado</th>
+                <th>Emitida</th>
+                <th>Vence</th>
+                <th>Líneas</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {datos.map((c) => (
+                <tr key={c.id}>
+                  <td>{c.id}</td>
+                  <td>{ESTADOS_COTIZACION[c.estado] ?? c.estado}</td>
+                  <td>{fecha(c.fecha_emision)}</td>
+                  <td>{c.fecha_vencimiento ? new Date(c.fecha_vencimiento).toLocaleDateString("es-CO") : "—"}</td>
+                  <td>
+                    {c.lineas.map((l) => (
+                      <div key={l.id}>
+                        {l.cantidad} × {l.descripcion} ({dinero(l.precio_unitario)})
+                      </div>
+                    ))}
+                  </td>
+                  <td>
+                    <strong>{dinero(c.total)}</strong>
+                    <div>
+                      <a
+                        style={{
+                          display: "inline-block",
+                          position: "static",
+                          margin: "8px 0 0",
+                          padding: "8px 14px",
+                          fontSize: "0.85rem",
+                          fontWeight: 600,
+                          background: "#25d366",
+                          color: "#fff",
+                          borderRadius: 8,
+                          textDecoration: "none",
+                        }}
+                        href={enlaceWhatsApp(solicitud, c)}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Enviar por WhatsApp
+                      </a>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {solicitud.estado === "cancelada" ? (
+        <p className="nota">La solicitud está cancelada: no se puede cotizar.</p>
+      ) : (
+        <div className="medidas-item">
+          <h4>Nueva cotización</h4>
+          {lineas.map((l, i) => (
+            <div key={i} className="medidas-rejilla" style={{ alignItems: "end" }}>
+              <label>
+                Descripción
+                <input
+                  value={l.descripcion}
+                  onChange={(e) => cambiar(i, "descripcion", e.target.value)}
+                />
+              </label>
+              <label>
+                Cantidad
+                <input
+                  inputMode="numeric"
+                  value={l.cantidad}
+                  onChange={(e) => cambiar(i, "cantidad", soloDigitos(e.target.value))}
+                />
+              </label>
+              <label>
+                Precio unitario ($)
+                <input
+                  inputMode="numeric"
+                  value={l.precio}
+                  onChange={(e) => cambiar(i, "precio", soloDigitos(e.target.value))}
+                />
+              </label>
+              <div>
+                <div className="nota">
+                  Subtotal: {dinero((Number(l.cantidad) || 0) * (Number(l.precio) || 0))}
+                </div>
+                {lineas.length > 1 && (
+                  <button
+                    type="button"
+                    className="secundario"
+                    onClick={() => setLineas(lineas.filter((_, j) => j !== i))}
+                  >
+                    Quitar línea
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+          <button
+            type="button"
+            className="secundario"
+            onClick={() =>
+              setLineas([
+                ...lineas,
+                { detalle_solicitud_id: null, descripcion: "", cantidad: "1", precio: "" },
+              ])
+            }
+          >
+            + Agregar línea
+          </button>
+          <div className="medidas-rejilla" style={{ marginTop: 12 }}>
+            <label>
+              Vigencia (días)
+              <input
+                inputMode="numeric"
+                value={dias}
+                onChange={(e) => setDias(soloDigitos(e.target.value))}
+              />
+            </label>
+            <label>
+              Observaciones
+              <input value={observaciones} onChange={(e) => setObservaciones(e.target.value)} />
+            </label>
+          </div>
+          <h4>Total: {dinero(total)}</h4>
+          <div className="acciones">
+            <button type="button" onClick={crear} disabled={guardando}>
+              {guardando ? "Guardando..." : "Crear cotización"}
+            </button>
+          </div>
+          {mensaje && (
+            <p
+              className={mensaje === "Cotización creada." ? "" : "error"}
+              style={mensaje === "Cotización creada." ? { color: "#1b7f3b" } : undefined}
+            >
+              {mensaje}
+            </p>
+          )}
+        </div>
       )}
     </div>
   );

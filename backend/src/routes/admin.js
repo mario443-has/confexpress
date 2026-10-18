@@ -3,6 +3,7 @@ import { pool } from "../db.js";
 import { crearToken, requireAdmin, verificarPassword } from "../auth.js";
 import { validar, crearSolicitud, errorHttp } from "../solicitudesServicio.js";
 import medidasRouter from "./medidas.js";
+import cotizacionesRouter from "./cotizaciones.js";
 
 const router = Router();
 
@@ -117,6 +118,7 @@ router.post("/solicitudes", async (req, res) => {
 });
 
 router.use(medidasRouter);
+router.use(cotizacionesRouter);
 
 router.get("/clientes", async (req, res) => {
   try {
