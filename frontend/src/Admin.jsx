@@ -651,6 +651,107 @@ function Cotizaciones({ solicitud, alExpirar, alCambiar }) {
   );
 }
 
+const ESTADOS_PEDIDO = {
+  confirmado: "Confirmado",
+  en_confeccion: "En confección",
+  listo: "Listo",
+  entregado: "Entregado",
+  cancelado: "Cancelado",
+};
+const CLASE_PEDIDO = {
+  confirmado: "estado-recibida",
+  en_confeccion: "estado-en_revision",
+  listo: "estado-en_revision",
+  entregado: "estado-cotizada",
+  cancelado: "estado-cancelada",
+};
+const SIGUIENTE_PEDIDO = {
+  confirmado: { estado: "en_confeccion", texto: "Pasar a en confección" },
+  en_confeccion: { estado: "listo", texto: "Marcar listo" },
+  listo: { estado: "entregado", texto: "Marcar entregado" },
+};
+
+function ListaPedidos({ alExpirar }) {
+  const { datos, error, recargar } = useAdmin("/pedidos", alExpirar);
+  const [mensaje, setMensaje] = useState("");
+
+  async function cambiar(id, estado) {
+    setMensaje("");
+    try {
+      await llamarAdmin(`/pedidos/${id}/estado`, {
+        method: "PATCH",
+        body: JSON.stringify({ estado }),
+      });
+      recargar();
+    } catch (e) {
+      if (e.estado === 401) alExpirar();
+      else setMensaje(e.message);
+    }
+  }
+
+  if (error) return <p className="error">{error}</p>;
+  if (!datos) return <p>Cargando...</p>;
+  if (datos.length === 0) return <p>Todavía no hay pedidos. Se crean al aceptar una cotización.</p>;
+
+  return (
+    <div>
+      {mensaje && <p className="error">{mensaje}</p>}
+      <div className="tabla-contenedor">
+        <table className="tabla">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Cliente</th>
+              <th>Pedido</th>
+              <th>Total</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {datos.map((p) => (
+              <tr key={p.id}>
+                <td>
+                  {p.id}
+                  <div className="nota">Solicitud #{p.solicitud_id}</div>
+                </td>
+                <td>
+                  {p.cliente}
+                  <div className="nota">{p.telefono}</div>
+                </td>
+                <td>{p.detalle}</td>
+                <td>{dinero(p.total)}</td>
+                <td>
+                  <span className={`estado ${CLASE_PEDIDO[p.estado]}`}>
+                    {ESTADOS_PEDIDO[p.estado]}
+                  </span>
+                  {p.fecha_entrega_real && (
+                    <div className="nota">
+                      Entregado el {new Date(p.fecha_entrega_real).toLocaleDateString("es-CO")}
+                    </div>
+                  )}
+                </td>
+                <td>
+                  {SIGUIENTE_PEDIDO[p.estado] && (
+                    <button type="button" onClick={() => cambiar(p.id, SIGUIENTE_PEDIDO[p.estado].estado)}>
+                      {SIGUIENTE_PEDIDO[p.estado].texto}
+                    </button>
+                  )}{" "}
+                  {SIGUIENTE_PEDIDO[p.estado] && (
+                    <button type="button" className="secundario" onClick={() => cambiar(p.id, "cancelado")}>
+                      Cancelar
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function ListaClientes({ alExpirar }) {
   const { datos, error } = useAdmin("/clientes", alExpirar);
   if (error) return <p className="error">{error}</p>;
@@ -748,6 +849,15 @@ export default function Admin() {
         >
           Nueva solicitud
         </button>
+      <button
+          className={pestana === "pedidos" ? "activa" : ""}
+          onClick={() => {
+            setPestana("pedidos");
+            setAbierta(null);
+          }}
+        >
+          Pedidos
+        </button>
       </nav>
 
       {pestana === "solicitudes" && abierta === null && (
@@ -758,6 +868,7 @@ export default function Admin() {
       )}
       {pestana === "clientes" && <ListaClientes alExpirar={salir} />}
       {pestana === "nueva" && <NuevaSolicitud />}
+      {pestana === "pedidos" && <ListaPedidos alExpirar={salir} />}
     </div>
   );
 }
