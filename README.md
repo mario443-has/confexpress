@@ -1,62 +1,49 @@
 # ConfeXpress
 
-Plataforma web para apoyar la gestión comercial de pequeños negocios de confección. Producto Mínimo Viable (PMV) de un proyecto productivo del SENA (Tecnólogo en Análisis y Desarrollo de Software, ficha 3070183). Se valida inicialmente en **E & M Confecciones** (Ipiales, Nariño).
+ConfeXpress es un sistema web para que un taller de confección pueda recibir las solicitudes de sus clientes, cotizarlas y seguir cada pedido hasta que se entrega. Es el producto mínimo viable del proyecto productivo del SENA (Tecnólogo en Análisis y Desarrollo de Software, ficha 3070183) y se está validando con E & M Confecciones, un negocio familiar de confección de Ipiales, Nariño.
 
-## Qué hace el PMV
+La idea es tener en un solo lugar lo que normalmente se reparte entre mensajes, llamadas y notas sueltas: qué pidió cada cliente, cuánto se cotizó, si la cotización se aceptó y en qué va el trabajo. WhatsApp se sigue usando para hablar con el cliente; el sistema no lo reemplaza, solo prepara el mensaje con la cotización.
 
-Flujo: catálogo → solicitud de cotización → cotización → pedido → seguimiento hasta la entrega.
+## Qué se puede hacer
 
-1. **Catálogo de productos y servicios**: vista pública con los productos y servicios del negocio.
-2. **Clientes**: se registran al llegar una solicitud; el panel tiene la lista de clientes.
-3. **Solicitud de cotización**: formulario público, y registro desde el panel para clientes que llegan al local o por WhatsApp (con medidas por prenda para trabajos a la medida).
-4. **Cotizaciones y pedidos**: el negocio cotiza cada solicitud, la envía (enlace a WhatsApp) y la marca como enviada, aceptada o rechazada. Al aceptarla se crea el pedido.
-5. **Seguimiento del pedido**: confirmado, en confección, listo, entregado (o cancelado).
+Desde la página pública, el cliente ve el catálogo de productos y servicios y puede enviar una solicitud de cotización con lo que necesita, las cantidades, la talla y las observaciones. El formulario pide autorización para el tratamiento de los datos personales y deja registrada la fecha en que se dio. Si el teléfono ya estaba registrado, la solicitud se asocia al mismo cliente.
 
-WhatsApp es un canal complementario: el panel genera el mensaje con la cotización, pero el envío lo hace la persona desde WhatsApp.
+Por el lado del negocio hay un panel con contraseña. Ahí se ven las solicitudes con su estado (recibida, en revisión, cotizada o cancelada) y también se pueden registrar las que llegan en el local o por WhatsApp, indicando de dónde llegó cada una. Cuando el producto se confecciona a la medida, el panel permite guardar las medidas por prenda en centímetros.
 
-## Fuera del PMV (posible desarrollo futuro)
+Cada solicitud puede tener una o varias cotizaciones. La cotización se arma con líneas de descripción, cantidad y precio unitario, tiene una vigencia en días (15 por defecto) y se puede enviar por WhatsApp con un botón que abre el chat con el mensaje ya escrito. Después se marca como enviada, aceptada o rechazada. Al aceptarla se crea el pedido automáticamente, y desde la pestaña de pedidos se va cambiando su estado: confirmado, en confección, listo y entregado. Un pedido se puede cancelar mientras no se haya entregado, y al entregarlo queda guardada la fecha.
 
-Anticipos y pagos en línea, inventario, automatizaciones (n8n), aplicación móvil, facturación electrónica, varios negocios (multiempresa).
+## Lo que todavía no tiene
+
+Esta versión no maneja anticipos ni pagos, inventario, facturación, automatizaciones ni aplicación móvil. Tampoco sirve todavía para varios negocios a la vez; está pensado para uno solo. Son cosas que podrían venir después, pero no forman parte del producto mínimo.
 
 ## Tecnología
 
-React + Vite (frontend), Node.js + Express (backend), MySQL 8 (base de datos).
+La interfaz está hecha con React y Vite, el servidor con Node.js y Express, y los datos se guardan en MySQL.
 
-## Requisitos
+## Cómo correrlo
 
-- Node.js 20.19 o superior (o 22.12 o superior)
-- MySQL 8
-## Instalación
+Se necesita Node.js 20.19 o superior y MySQL 8.
 
-### 1. Base de datos
-
-El script crea la base `confexpress`, todas las tablas y el catálogo inicial. **Atención:** borra y vuelve a crear las tablas, así que úsalo solo en una instalación nueva.
+Primero se crea la base de datos. El script crea la base `confexpress` con todas sus tablas y un catálogo de ejemplo. Si las tablas ya existen las borra y las vuelve a crear, así que solo se debe usar en una instalación nueva:
 
 ```
 mysql -u root -p < database/confexpress.sql
 ```
 
-(En PowerShell: `cmd /c "mysql -u root -p < database\confexpress.sql"`.)
+En PowerShell ese comando se escribe así: `cmd /c "mysql -u root -p < database\confexpress.sql"`
 
-### 2. Backend
+Después se prepara el servidor. Se copia `.env.example` como `.env` y se completa con el usuario y la contraseña de MySQL y con la contraseña que se quiera usar para entrar al panel (`ADMIN_PASSWORD`). Luego se instalan las dependencias y se arranca:
 
 ```
 cd backend
 copy .env.example .env
-```
-
-Edita `.env` con tus datos (usuario y contraseña de MySQL, y la contraseña del panel en `ADMIN_PASSWORD`). Luego:
-
-```
 npm install
 npm run dev
 ```
 
-Queda en http://localhost:3001 (revisa http://localhost:3001/api/salud).
+El servidor queda en http://localhost:3001. Para comprobar que llegó bien a la base de datos se puede abrir http://localhost:3001/api/salud.
 
-### 3. Frontend
-
-En otra terminal:
+Por último se arranca la interfaz, en otra terminal. El servidor debe estar encendido porque la interfaz le pide los datos a él:
 
 ```
 cd frontend
@@ -64,25 +51,16 @@ npm install
 npm run dev
 ```
 
-Abre http://localhost:5173 (catálogo y formulario de solicitud). El panel administrativo está en http://localhost:5173/#/admin.
-## Probar el flujo
+La página pública queda en http://localhost:5173 y el panel en http://localhost:5173/#/admin. La sesión del panel dura 8 horas.
 
-1. En http://localhost:5173 envía una solicitud de cotización.
-2. Entra al panel (`/#/admin`) con la contraseña de `ADMIN_PASSWORD`.
-3. En **Solicitudes**, abre la solicitud, crea la cotización y márcala como enviada.
-4. Acéptala con **Aceptar y crear pedido**.
-5. En **Pedidos**, avanza el estado hasta entregado.
+## Para probarlo
 
-## Configuración del negocio
+Se envía una solicitud desde la página pública, se entra al panel y se abre en la lista de solicitudes. Allí se crea la cotización, se marca como enviada y se acepta. Con eso aparece el pedido en la pestaña Pedidos, donde se puede avanzar hasta entregado.
 
-`frontend/src/config.js` tiene el nombre del negocio y el número de WhatsApp (con indicativo de país, sin signos). Si el número queda vacío, el botón de WhatsApp del formulario público no se muestra.
+## Configuración
 
-## Estructura
+El nombre del negocio y el número de WhatsApp están en `frontend/src/config.js`. El número va con el indicativo del país y sin signos ni espacios. Mientras esté vacío, el botón de WhatsApp del formulario público no se muestra.
 
-- `backend/`: API (Express). Rutas en `backend/src/routes`.
-- `frontend/`: interfaz (React + Vite).
-- `database/confexpress.sql`: esquema y catálogo inicial.
+## Organización del proyecto
 
-## Estado
-
-PMV en desarrollo. El catálogo inicial es de demostración y no incluye precios verificados.
+La carpeta `backend` tiene el servidor y sus rutas, `frontend` tiene la interfaz y `database` tiene el script con el esquema y el catálogo. El catálogo que trae el script es solo de ejemplo y no incluye precios reales.
