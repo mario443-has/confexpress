@@ -418,6 +418,7 @@ function Cotizaciones({ solicitud, alExpirar, alCambiar }) {
     }))
   );
   const [dias, setDias] = useState("15");
+  const [avisoEstado, setAvisoEstado] = useState("");
   const [observaciones, setObservaciones] = useState("");
   const [mensaje, setMensaje] = useState("");
   const [guardando, setGuardando] = useState(false);
@@ -429,6 +430,25 @@ function Cotizaciones({ solicitud, alExpirar, alCambiar }) {
 
   function cambiar(indice, campo, valor) {
     setLineas(lineas.map((l, i) => (i === indice ? { ...l, [campo]: valor } : l)));
+  }
+
+  async function cambiarEstadoCotizacion(cotizacionId, estado) {
+    setAvisoEstado("");
+    try {
+      const r = await llamarAdmin(`/cotizaciones/${cotizacionId}/estado`, {
+        method: "PATCH",
+        body: JSON.stringify({ estado }),
+      });
+      setAvisoEstado(
+        r.pedido_id
+          ? `Cotización aceptada. Se creó el pedido #${r.pedido_id}.`
+          : "Estado de la cotización actualizado."
+      );
+      recargar();
+    } catch (e) {
+      if (e.estado === 401) alExpirar();
+      else setAvisoEstado(e.message);
+    }
   }
 
   async function crear() {
@@ -491,6 +511,23 @@ function Cotizaciones({ solicitud, alExpirar, alCambiar }) {
                   </td>
                   <td>
                     <strong>{dinero(c.total)}</strong>
+                    <div className="acciones" style={{ marginTop: 8 }}>
+                      {c.estado === "borrador" && (
+                        <button type="button" className="secundario" onClick={() => cambiarEstadoCotizacion(c.id, "enviada")}>
+                          Marcar enviada
+                        </button>
+                      )}
+                      {(c.estado === "borrador" || c.estado === "enviada") && (
+                        <>
+                          <button type="button" onClick={() => cambiarEstadoCotizacion(c.id, "aceptada")}>
+                            Aceptar y crear pedido
+                          </button>
+                          <button type="button" className="secundario" onClick={() => cambiarEstadoCotizacion(c.id, "rechazada")}>
+                            Rechazar
+                          </button>
+                        </>
+                      )}
+                    </div>
                     <div>
                       <a
                         style={{
@@ -519,6 +556,8 @@ function Cotizaciones({ solicitud, alExpirar, alCambiar }) {
           </table>
         </div>
       )}
+
+      {avisoEstado && <p className="nota"><strong>{avisoEstado}</strong></p>}
 
       {solicitud.estado === "cancelada" ? (
         <p className="nota">La solicitud está cancelada: no se puede cotizar.</p>
