@@ -365,6 +365,7 @@ const ESTADOS_COTIZACION = {
   enviada: "Enviada",
   aceptada: "Aceptada",
   rechazada: "Rechazada",
+  vencida: "Vencida",
 };
 
 function dinero(valor) {
@@ -422,6 +423,7 @@ function Cotizaciones({ solicitud, alExpirar, alCambiar }) {
   const [observaciones, setObservaciones] = useState("");
   const [mensaje, setMensaje] = useState("");
   const [guardando, setGuardando] = useState(false);
+  const hayCotizacionAceptada = datos?.some((cotizacion) => cotizacion.estado === "aceptada");
 
   const total = lineas.reduce(
     (suma, l) => suma + (Number(l.cantidad) || 0) * (Number(l.precio) || 0),
@@ -508,6 +510,7 @@ function Cotizaciones({ solicitud, alExpirar, alCambiar }) {
                         {l.cantidad} × {l.descripcion} ({dinero(l.precio_unitario)})
                       </div>
                     ))}
+                    {c.observaciones && <div className="nota">{c.observaciones}</div>}
                   </td>
                   <td>
                     <strong>{dinero(c.total)}</strong>
@@ -528,27 +531,29 @@ function Cotizaciones({ solicitud, alExpirar, alCambiar }) {
                         </>
                       )}
                     </div>
-                    <div>
-                      <a
-                        style={{
-                          display: "inline-block",
-                          position: "static",
-                          margin: "8px 0 0",
-                          padding: "8px 14px",
-                          fontSize: "0.85rem",
-                          fontWeight: 600,
-                          background: "#25d366",
-                          color: "#fff",
-                          borderRadius: 8,
-                          textDecoration: "none",
-                        }}
-                        href={enlaceWhatsApp(solicitud, c)}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Enviar por WhatsApp
-                      </a>
-                    </div>
+                    {(c.estado === "borrador" || c.estado === "enviada") && (
+                      <div>
+                        <a
+                          style={{
+                            display: "inline-block",
+                            position: "static",
+                            margin: "8px 0 0",
+                            padding: "8px 14px",
+                            fontSize: "0.85rem",
+                            fontWeight: 600,
+                            background: "#25d366",
+                            color: "#fff",
+                            borderRadius: 8,
+                            textDecoration: "none",
+                          }}
+                          href={enlaceWhatsApp(solicitud, c)}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Enviar por WhatsApp
+                        </a>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -561,6 +566,8 @@ function Cotizaciones({ solicitud, alExpirar, alCambiar }) {
 
       {solicitud.estado === "cancelada" ? (
         <p className="nota">La solicitud está cancelada: no se puede cotizar.</p>
+      ) : hayCotizacionAceptada ? (
+        <p className="nota">Esta solicitud ya tiene una cotización aceptada y su pedido fue creado.</p>
       ) : (
         <div className="medidas-item">
           <h4>Nueva cotización</h4>

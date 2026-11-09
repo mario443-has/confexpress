@@ -3,12 +3,25 @@ import { pool } from "../db.js";
 
 const router = Router();
 
+async function vencerCotizaciones(conexion, solicitudId) {
+  await conexion.query(
+    `UPDATE cotizaciones
+     SET estado = 'vencida'
+     WHERE solicitud_id = ?
+       AND estado IN ('borrador', 'enviada')
+       AND fecha_vencimiento IS NOT NULL
+       AND fecha_vencimiento < CURDATE()`,
+    [solicitudId]
+  );
+}
+
 router.get("/solicitudes/:id/cotizaciones", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id < 1) {
     return res.status(400).json({ error: "Solicitud no válida." });
   }
   try {
+    await vencerCotizaciones(pool, id);
     const [cotizaciones] = await pool.query(
       "SELECT id, estado, fecha_emision, fecha_vencimiento, observaciones FROM cotizaciones WHERE solicitud_id = ? ORDER BY id DESC",
       [id]
@@ -91,25 +104,46 @@ router.post("/solicitudes/:id/cotizaciones", async (req, res) => {
   }
 
   try {
-    const [solicitudes] = await pool.query("SELECT estado FROM solicitudes WHERE id = ?", [solicitudId]);
-    if (solicitudes.length === 0) {
-      return res.status(404).json({ error: "La solicitud no existe." });
-    }
-    if (solicitudes[0].estado === "cancelada") {
-      return res.status(400).json({ error: "La solicitud está cancelada." });
-    }
-
-    const [propios] = await pool.query("SELECT id FROM detalles_solicitud WHERE solicitud_id = ?", [solicitudId]);
-    const idsValidos = new Set(propios.map((p) => p.id));
-    for (const l of lineas) {
-      if (l.vinculo !== null && !idsValidos.has(l.vinculo)) {
-        return res.status(400).json({ error: "Una línea apunta a un ítem que no es de esta solicitud." });
-      }
-    }
-
     const conexion = await pool.getConnection();
     try {
       await conexion.beginTransaction();
+      const [solicitudes] = await conexion.query(
+        "SELECT estado FROM solicitudes WHERE id = ? FOR UPDATE",
+        [solicitudId]
+      );
+      if (solicitudes.length === 0) {
+        await conexion.rollback();
+        return res.status(404).json({ error: "La solicitud no existe." });
+      }
+      if (solicitudes[0].estado === "cancelada") {
+        await conexion.rollback();
+        return res.status(400).json({ error: "La solicitud está cancelada." });
+      }
+
+      await vencerCotizaciones(conexion, solicitudId);
+      const [aceptadas] = await conexion.query(
+        "SELECT id FROM cotizaciones WHERE solicitud_id = ? AND estado = 'aceptada'",
+        [solicitudId]
+      );
+      if (aceptadas.length > 0) {
+        await conexion.rollback();
+        return res.status(409).json({
+          error: "La solicitud ya tiene una cotización aceptada y un pedido creado.",
+        });
+      }
+
+      const [propios] = await conexion.query(
+        "SELECT id FROM detalles_solicitud WHERE solicitud_id = ?",
+        [solicitudId]
+      );
+      const idsValidos = new Set(propios.map((p) => p.id));
+      for (const l of lineas) {
+        if (l.vinculo !== null && !idsValidos.has(l.vinculo)) {
+          await conexion.rollback();
+          return res.status(400).json({ error: "Una línea apunta a un ítem que no es de esta solicitud." });
+        }
+      }
+
       const [cotizacion] = await conexion.query(
         "INSERT INTO cotizaciones (solicitud_id, estado, fecha_emision, fecha_vencimiento, observaciones) VALUES (?, 'borrador', NOW(), DATE_ADD(CURDATE(), INTERVAL ? DAY), ?)",
         [solicitudId, diasValidez, observaciones]

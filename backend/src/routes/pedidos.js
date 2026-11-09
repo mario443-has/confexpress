@@ -23,14 +23,30 @@ router.patch("/cotizaciones/:id/estado", async (req, res) => {
   try {
     await conexion.beginTransaction();
 
+    const [cotizaciones] = await conexion.query(
+      "SELECT solicitud_id FROM cotizaciones WHERE id = ?",
+      [id]
+    );
+    if (cotizaciones.length === 0) {
+      await conexion.rollback();
+      return res.status(404).json({ error: "La cotización no existe." });
+    }
+    const solicitudId = cotizaciones[0].solicitud_id;
+    await conexion.query("SELECT id FROM solicitudes WHERE id = ? FOR UPDATE", [solicitudId]);
+    await conexion.query(
+      `UPDATE cotizaciones
+       SET estado = 'vencida'
+       WHERE solicitud_id = ?
+         AND estado IN ('borrador', 'enviada')
+         AND fecha_vencimiento IS NOT NULL
+         AND fecha_vencimiento < CURDATE()`,
+      [solicitudId]
+    );
+
     const [filas] = await conexion.query(
       "SELECT estado FROM cotizaciones WHERE id = ? FOR UPDATE",
       [id]
     );
-    if (filas.length === 0) {
-      await conexion.rollback();
-      return res.status(404).json({ error: "La cotización no existe." });
-    }
     const actual = filas[0].estado;
     if (!(TRANSICIONES[actual] ?? []).includes(estado)) {
       await conexion.rollback();
@@ -43,6 +59,16 @@ router.patch("/cotizaciones/:id/estado", async (req, res) => {
 
     let pedidoId = null;
     if (estado === "aceptada") {
+      const [aceptadas] = await conexion.query(
+        "SELECT id FROM cotizaciones WHERE solicitud_id = ? AND estado = 'aceptada' AND id <> ? FOR UPDATE",
+        [solicitudId, id]
+      );
+      if (aceptadas.length > 0) {
+        await conexion.rollback();
+        return res.status(409).json({
+          error: "La solicitud ya tiene otra cotización aceptada y un pedido creado.",
+        });
+      }
       const [pedido] = await conexion.query(
         "INSERT INTO pedidos (cotizacion_id, estado) VALUES (?, 'confirmado')",
         [id]
@@ -99,29 +125,37 @@ router.patch("/pedidos/:id/estado", async (req, res) => {
   if (!["en_confeccion", "listo", "entregado", "cancelado"].includes(estado)) {
     return res.status(400).json({ error: "Estado no permitido." });
   }
+  const conexion = await pool.getConnection();
   try {
-    const [filas] = await pool.query("SELECT estado FROM pedidos WHERE id = ?", [id]);
+    await conexion.beginTransaction();
+    const [filas] = await conexion.query("SELECT estado FROM pedidos WHERE id = ? FOR UPDATE", [id]);
     if (filas.length === 0) {
+      await conexion.rollback();
       return res.status(404).json({ error: "El pedido no existe." });
     }
     const actual = filas[0].estado;
     if (!(TRANSICIONES_PEDIDO[actual] ?? []).includes(estado)) {
+      await conexion.rollback();
       return res
         .status(409)
         .json({ error: `Un pedido ${actual} no puede pasar a ${estado}.` });
     }
     if (estado === "entregado") {
-      await pool.query(
+      await conexion.query(
         "UPDATE pedidos SET estado = ?, fecha_entrega_real = CURDATE() WHERE id = ?",
         [estado, id]
       );
     } else {
-      await pool.query("UPDATE pedidos SET estado = ? WHERE id = ?", [estado, id]);
+      await conexion.query("UPDATE pedidos SET estado = ? WHERE id = ?", [estado, id]);
     }
+    await conexion.commit();
     res.json({ id, estado });
   } catch (e) {
+    await conexion.rollback();
     console.error(e);
     res.status(500).json({ error: "No se pudo actualizar el pedido." });
+  } finally {
+    conexion.release();
   }
 });
 

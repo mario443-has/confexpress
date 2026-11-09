@@ -1,11 +1,11 @@
 import { pool } from "./db.js";
 
-const REGEX_TELEFONO = /^\+?\d{7,15}$/;
+const REGEX_TELEFONO = /^\d{7,15}$/;
 const REGEX_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function validar(body, { permitirMedidas = false } = {}) {
   const nombre = String(body.nombre ?? "").trim();
-  const telefono = String(body.telefono ?? "").replace(/[\s()-]/g, "");
+  const telefono = String(body.telefono ?? "").replace(/\D/g, "");
   const correo = String(body.correo ?? "").trim();
   const observaciones = String(body.observaciones ?? "").trim();
 
