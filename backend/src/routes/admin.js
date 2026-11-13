@@ -5,6 +5,7 @@ import { validar, crearSolicitud, errorHttp } from "../solicitudesServicio.js";
 import medidasRouter from "./medidas.js";
 import cotizacionesRouter from "./cotizaciones.js";
 import pedidosRouter from "./pedidos.js";
+import catalogoRouter from "./catalogo.js";
 
 const router = Router();
 
@@ -24,6 +25,7 @@ router.post("/login", (req, res) => {
 });
 
 router.use(requireAdmin);
+router.use("/catalogo", catalogoRouter);
 
 router.get("/solicitudes", async (req, res) => {
   try {
