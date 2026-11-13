@@ -28,3 +28,7 @@ export async function llamarAdmin(ruta, opciones = {}) {
 
   return datos;
 }
+
+// En desarrollo las imagenes las sirve el backend (puerto 3001); en produccion, el mismo origen.
+export const urlImagen = (ruta) =>
+  `${import.meta.env.DEV ? "http://localhost:3001" : ""}${ruta}`;
