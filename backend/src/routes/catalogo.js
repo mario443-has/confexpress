@@ -67,21 +67,31 @@ function convertirBooleano(valor) {
     valor === "true" || valor === "on";
 }
 
+// Errores de datos enviados por el usuario (se informan con su mensaje).
+// Cualquier otro error (por ejemplo, de MySQL) no se muestra al cliente.
+class ErrorValidacion extends Error {}
+
 function validarProducto(datos) {
   const nombre = String(datos.nombre || "").trim();
   const tipo = datos.tipo;
   const modalidad = datos.modalidad || "requiere_consulta";
 
   if (!nombre || nombre.length > 120) {
-    throw new Error("El nombre es obligatorio y no puede superar 120 caracteres.");
+    throw new ErrorValidacion("El nombre es obligatorio y no puede superar 120 caracteres.");
   }
 
   if (!["producto", "servicio"].includes(tipo)) {
-    throw new Error("El tipo debe ser producto o servicio.");
+    throw new ErrorValidacion("El tipo debe ser producto o servicio.");
   }
 
   if (!["entrega_inmediata", "por_encargo", "requiere_consulta"].includes(modalidad)) {
-    throw new Error("La modalidad seleccionada no es válida.");
+    throw new ErrorValidacion("La modalidad seleccionada no es válida.");
+  }
+
+  const categoria = datos.categoria || null;
+
+  if (categoria && String(categoria).length > 60) {
+    throw new ErrorValidacion("La categoría no puede superar 60 caracteres.");
   }
 
   let precio = null;
@@ -92,7 +102,7 @@ function validarProducto(datos) {
     precio = Number(datos.precio_referencia);
 
     if (!Number.isFinite(precio) || precio < 0) {
-      throw new Error("El precio debe ser un número igual o mayor que cero.");
+      throw new ErrorValidacion("El precio debe ser un número igual o mayor que cero.");
     }
   }
 
@@ -100,7 +110,7 @@ function validarProducto(datos) {
     nombre,
     descripcion: datos.descripcion || null,
     tipo,
-    categoria: datos.categoria || null,
+    categoria,
     precio,
     modalidad,
     a_medida: convertirBooleano(datos.a_medida) ? 1 : 0,
@@ -144,7 +154,7 @@ router.get("/", async (_req, res) => {
 // Crear un producto.
 router.post("/", async (req, res) => {
   try {
-    const datos = validarProducto(req.body);
+    const datos = validarProducto(req.body || {});
 
     const [resultado] = await pool.query(
       `INSERT INTO productos
@@ -169,7 +179,10 @@ router.post("/", async (req, res) => {
     });
   } catch (error) {
     console.error("Error creando producto:", error);
-    res.status(400).json({ error: error.message || "No se pudo crear el producto." });
+    if (error instanceof ErrorValidacion) {
+      return res.status(400).json({ error: error.message });
+    }
+    res.status(500).json({ error: "No se pudo crear el producto." });
   }
 });
 
@@ -182,7 +195,7 @@ router.put("/:id", async (req, res) => {
       return res.status(400).json({ error: "Identificador no válido." });
     }
 
-    const datos = validarProducto(req.body);
+    const datos = validarProducto(req.body || {});
 
     const [resultado] = await pool.query(
       `UPDATE productos
@@ -210,7 +223,10 @@ router.put("/:id", async (req, res) => {
     res.json({ mensaje: "Producto actualizado correctamente." });
   } catch (error) {
     console.error("Error actualizando producto:", error);
-    res.status(400).json({ error: error.message || "No se pudo actualizar el producto." });
+    if (error instanceof ErrorValidacion) {
+      return res.status(400).json({ error: error.message });
+    }
+    res.status(500).json({ error: "No se pudo actualizar el producto." });
   }
 });
 
@@ -218,6 +234,10 @@ router.put("/:id", async (req, res) => {
 router.patch("/:id/estado", async (req, res) => {
   try {
     const id = Number(req.params.id);
+    if (req.body?.activo === undefined) {
+      return res.status(400).json({ error: "Falta indicar el estado (activo)." });
+    }
+
     const activo = convertirBooleano(req.body.activo) ? 1 : 0;
 
     if (!Number.isInteger(id) || id <= 0) {
@@ -283,6 +303,11 @@ router.post("/:id/imagenes", (req, res, next) => {
     try {
       await conexion.beginTransaction();
 
+      const [[{ siguiente }]] = await conexion.query(
+        "SELECT COALESCE(MAX(orden), -1) + 1 AS siguiente FROM galeria_imagenes WHERE producto_id = ?",
+        [id]
+      );
+
       for (let i = 0; i < archivos.length; i++) {
         const archivo = archivos[i];
         const titulo = path.basename(
@@ -298,7 +323,7 @@ router.post("/:id/imagenes", (req, res, next) => {
             id,
             titulo || "Imagen del producto",
             `/uploads/catalogo/${archivo.filename}`,
-            i,
+            Number(siguiente) + i,
           ]
         );
       }
@@ -325,7 +350,7 @@ router.post("/:id/imagenes", (req, res, next) => {
 router.patch("/imagenes/:id", async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const { titulo, descripcion, orden } = req.body;
+    const { titulo, descripcion, orden } = req.body || {};
 
     if (!Number.isInteger(id) || id <= 0) {
       return res.status(400).json({ error: "Identificador no válido." });
@@ -376,6 +401,10 @@ router.patch("/imagenes/:id", async (req, res) => {
 router.patch("/imagenes/:id/estado", async (req, res) => {
   try {
     const id = Number(req.params.id);
+    if (req.body?.activo === undefined) {
+      return res.status(400).json({ error: "Falta indicar el estado (activo)." });
+    }
+
     const activo = convertirBooleano(req.body.activo) ? 1 : 0;
 
     if (!Number.isInteger(id) || id <= 0) {

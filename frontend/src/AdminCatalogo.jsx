@@ -118,6 +118,8 @@ export default function AdminCatalogo({ alExpirar }) {
       categoria: formulario.categoria.trim() || null,
     };
 
+    let productoGuardado = false;
+
     try {
       let respuesta;
       if (editando) {
@@ -130,8 +132,11 @@ export default function AdminCatalogo({ alExpirar }) {
           method: "POST",
           body: JSON.stringify(datos),
         });
+        // Desde aquí el producto ya existe: un nuevo guardado debe editarlo, no duplicarlo.
+        setEditando(respuesta.id);
       }
 
+      productoGuardado = true;
       const idProducto = editando || respuesta.id;
 
       if (archivos.length && idProducto) {
@@ -157,7 +162,13 @@ export default function AdminCatalogo({ alExpirar }) {
         alExpirar?.();
         return;
       }
-      setError(e.message || "No fue posible guardar el producto.");
+      const detalle = e.message || "No fue posible guardar el producto.";
+      if (productoGuardado) {
+        cargarProductos(true);
+        setError(`El producto se guardó, pero las imágenes no se pudieron subir: ${detalle}`);
+      } else {
+        setError(detalle);
+      }
     } finally {
       setGuardando(false);
     }
