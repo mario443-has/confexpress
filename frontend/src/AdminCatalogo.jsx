@@ -26,6 +26,7 @@ export default function AdminCatalogo({ alExpirar }) {
   const [formulario, setFormulario] = useState(FORMULARIO_VACIO);
   const [editando, setEditando] = useState(null);
   const [archivos, setArchivos] = useState([]);
+  const [claveArchivos, setClaveArchivos] = useState(0);
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
@@ -77,6 +78,12 @@ export default function AdminCatalogo({ alExpirar }) {
     }));
   }
 
+  // Vacía la lista de archivos y también el selector del navegador (cambiando su key).
+  function reiniciarArchivos() {
+    setArchivos([]);
+    setClaveArchivos((clave) => clave + 1);
+  }
+
   function prepararEdicion(producto) {
     setEditando(producto.id);
     setFormulario({
@@ -89,7 +96,7 @@ export default function AdminCatalogo({ alExpirar }) {
       a_medida: Boolean(Number(producto.a_medida)),
       destacado: Boolean(Number(producto.destacado)),
     });
-    setArchivos([]);
+    reiniciarArchivos();
     setMensaje("");
     setError("");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -98,7 +105,7 @@ export default function AdminCatalogo({ alExpirar }) {
   function limpiarFormulario() {
     setEditando(null);
     setFormulario(FORMULARIO_VACIO);
-    setArchivos([]);
+    reiniciarArchivos();
     setMensaje("");
     setError("");
   }
@@ -151,7 +158,7 @@ export default function AdminCatalogo({ alExpirar }) {
       await cargarProductos(true);
       setEditando(null);
       setFormulario(FORMULARIO_VACIO);
-      setArchivos([]);
+      reiniciarArchivos();
       setMensaje(
         archivos.length
           ? "Producto guardado e imágenes cargadas correctamente."
@@ -371,6 +378,7 @@ export default function AdminCatalogo({ alExpirar }) {
             Imágenes {editando ? "(puedes agregar más)" : "(puedes cargarlas después de crear)"}
           </label>
           <input
+            key={claveArchivos}
             id="catalogo-imagenes"
             type="file"
             accept="image/jpeg,image/png,image/webp"
