@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { pool } from "../db.js";
+import pagosRouter, { cuentaDelPedido } from "./pagos.js";
 
 const router = Router();
 
@@ -99,6 +100,7 @@ router.get("/pedidos", async (req, res) => {
       `SELECT p.id, p.estado, p.creado_en, p.fecha_entrega_real,
               c.id AS cotizacion_id, s.id AS solicitud_id,
               cl.nombre AS cliente, cl.telefono,
+              (SELECT COALESCE(SUM(g.monto), 0) FROM pagos g WHERE g.pedido_id = p.id AND g.anulado = 0) AS pagado,
               (SELECT COALESCE(SUM(d.cantidad * d.precio_unitario), 0)
                  FROM detalles_cotizacion d WHERE d.cotizacion_id = c.id) AS total,
               (SELECT GROUP_CONCAT(CONCAT(d.cantidad, ' × ', d.descripcion) SEPARATOR '; ')
@@ -109,7 +111,7 @@ router.get("/pedidos", async (req, res) => {
        JOIN clientes cl ON cl.id = s.cliente_id
        ORDER BY p.creado_en DESC, p.id DESC`
     );
-    res.json(filas.map((f) => ({ ...f, total: Number(f.total) })));
+    res.json(filas.map((f) => ({ ...f, total: Number(f.total), pagado: Number(f.pagado), saldo: Number(f.total) - Number(f.pagado) })));
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "No se pudieron obtener los pedidos." });
@@ -140,6 +142,21 @@ router.patch("/pedidos/:id/estado", async (req, res) => {
         .status(409)
         .json({ error: `Un pedido ${actual} no puede pasar a ${estado}.` });
     }
+    if (estado === "en_confeccion" || estado === "entregado") {
+      const cuenta = await cuentaDelPedido(conexion, id);
+      if (estado === "en_confeccion" && !cuenta.soloArreglos && cuenta.pagado <= 0) {
+        await conexion.rollback();
+        return res
+          .status(409)
+          .json({ error: "Este pedido necesita un anticipo antes de empezar la confección." });
+      }
+      if (estado === "entregado" && cuenta.saldo > 0) {
+        await conexion.rollback();
+        return res.status(409).json({
+          error: `No se puede entregar: falta pagar $${cuenta.saldo.toLocaleString("es-CO")}.`,
+        });
+      }
+    }
     if (estado === "entregado") {
       await conexion.query(
         "UPDATE pedidos SET estado = ?, fecha_entrega_real = CURDATE() WHERE id = ?",
@@ -158,5 +175,7 @@ router.patch("/pedidos/:id/estado", async (req, res) => {
     conexion.release();
   }
 });
+
+router.use(pagosRouter);
 
 export default router;
