@@ -829,7 +829,10 @@ export default function Admin() {
   return (
     <div className="contenedor">
       <header className="barra">
-        <h1>ConfeXpress · Panel</h1>
+        <div className="marca-barra">
+          <img className="logo logo-pequeno" src="/logo-eym.png" alt="E y M Confecciones" />
+          <h1>ConfeXpress · Panel</h1>
+        </div>
         <button className="secundario" onClick={salir}>
           Cerrar sesión
         </button>

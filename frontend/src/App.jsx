@@ -76,8 +76,11 @@ function Catalogo() {
   return (
     <div className="contenedor">
       <header className="encabezado">
-        <h1>ConfeXpress</h1>
-        <p>Catálogo de productos y servicios de confección</p>
+        <img className="logo" src="/logo-eym.png" alt="E y M Confecciones" />
+        <div>
+          <h1>ConfeXpress</h1>
+          <p>Catálogo de productos y servicios de confección</p>
+        </div>
       </header>
 
       {cargando && <p>Cargando catálogo...</p>}
