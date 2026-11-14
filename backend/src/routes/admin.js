@@ -5,6 +5,7 @@ import { validar, crearSolicitud, errorHttp } from "../solicitudesServicio.js";
 import medidasRouter from "./medidas.js";
 import cotizacionesRouter from "./cotizaciones.js";
 import pedidosRouter from "./pedidos.js";
+import colegiosRouter from "./colegios.js";
 import catalogoRouter from "./catalogo.js";
 
 const router = Router();
@@ -123,6 +124,7 @@ router.post("/solicitudes", async (req, res) => {
 router.use(medidasRouter);
 router.use(cotizacionesRouter);
 router.use(pedidosRouter);
+router.use(colegiosRouter);
 
 router.get("/clientes", async (req, res) => {
   try {

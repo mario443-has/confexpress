@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { borrarToken, guardarToken, llamarAdmin, obtenerToken } from "./api.js";
 import FormularioSolicitud from "./FormularioSolicitud.jsx";
 import AdminCatalogo from "./AdminCatalogo.jsx";
+import AdminColegios from "./AdminColegios.jsx";
 import { NOMBRE_NEGOCIO } from "./config.js";
 
 const ESTADOS = {
@@ -1105,7 +1106,12 @@ export default function Admin() {
       {pestana === "clientes" && <ListaClientes alExpirar={salir} />}
       {pestana === "nueva" && <NuevaSolicitud />}
       {pestana === "pedidos" && <ListaPedidos alExpirar={salir} />}
-      {pestana === "catalogo" && <AdminCatalogo alExpirar={salir} />}
+      {pestana === "catalogo" && (
+        <>
+          <AdminColegios alExpirar={salir} />
+          <AdminCatalogo alExpirar={salir} />
+        </>
+      )}
     </div>
   );
 }
