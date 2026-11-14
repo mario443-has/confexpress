@@ -679,9 +679,175 @@ const SIGUIENTE_PEDIDO = {
   listo: { estado: "entregado", texto: "Marcar entregado" },
 };
 
+function PagosPedido({ pedido, alCerrar, alExpirar, alCambiar }) {
+  const { datos, error, recargar } = useAdmin(`/pedidos/${pedido.id}/pagos`, alExpirar);
+  const [monto, setMonto] = useState("");
+  const [metodo, setMetodo] = useState("efectivo");
+  const [fechaPago, setFechaPago] = useState("");
+  const [nota, setNota] = useState("");
+  const [mensaje, setMensaje] = useState("");
+  const [guardando, setGuardando] = useState(false);
+
+  async function registrar(e) {
+    e.preventDefault();
+    setMensaje("");
+    setGuardando(true);
+    try {
+      await llamarAdmin(`/pedidos/${pedido.id}/pagos`, {
+        method: "POST",
+        body: JSON.stringify({
+          monto: Number(monto),
+          metodo,
+          fecha_pago: fechaPago || undefined,
+          nota,
+        }),
+      });
+      setMonto("");
+      setNota("");
+      setFechaPago("");
+      recargar();
+      alCambiar();
+    } catch (err) {
+      if (err.estado === 401) alExpirar();
+      else setMensaje(err.message);
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  async function anular(pagoId) {
+    const motivo = window.prompt("Motivo de la anulación:");
+    if (!motivo || !motivo.trim()) return;
+    setMensaje("");
+    try {
+      await llamarAdmin(`/pagos/${pagoId}/anular`, {
+        method: "PATCH",
+        body: JSON.stringify({ motivo }),
+      });
+      recargar();
+      alCambiar();
+    } catch (err) {
+      if (err.estado === 401) alExpirar();
+      else setMensaje(err.message);
+    }
+  }
+
+  const admitePagos =
+    datos &&
+    ["confirmado", "en_confeccion", "listo"].includes(datos.estado) &&
+    datos.saldo > 0;
+
+  return (
+    <div>
+      <div className="barra">
+        <h3 style={{ margin: 0 }}>Anticipos · Pedido #{pedido.id}</h3>
+        <button type="button" className="secundario" onClick={alCerrar}>
+          Cerrar
+        </button>
+      </div>
+      <p className="nota">
+        {pedido.cliente} · {pedido.detalle}
+      </p>
+      {error && <p className="error">{error}</p>}
+      {!datos && !error && <p>Cargando...</p>}
+      {datos && (
+        <>
+          <p>
+            <strong>Total:</strong> {dinero(datos.total)} · <strong>Pagado:</strong>{" "}
+            {dinero(datos.pagado)} · <strong>Saldo:</strong> {dinero(datos.saldo)}
+          </p>
+
+          {datos.pagos.length === 0 ? (
+            <p className="nota">Todavía no hay anticipos registrados.</p>
+          ) : (
+            <div className="tabla-contenedor" style={{ marginBottom: 16 }}>
+              <table className="tabla">
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Monto</th>
+                    <th>Cómo pagó</th>
+                    <th>Nota</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {datos.pagos.map((g) => (
+                    <tr key={g.id} style={g.anulado ? { opacity: 0.55 } : undefined}>
+                      <td>{g.fecha_pago}</td>
+                      <td>{dinero(g.monto)}</td>
+                      <td>{g.metodo === "efectivo" ? "Efectivo" : "Transferencia"}</td>
+                      <td>
+                        {g.nota ?? "—"}
+                        {g.anulado && (
+                          <div className="nota">Anulado: {g.motivo_anulacion}</div>
+                        )}
+                      </td>
+                      <td>
+                        {!g.anulado && datos.estado !== "entregado" && (
+                          <button type="button" className="secundario" onClick={() => anular(g.id)}>
+                            Anular
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {admitePagos ? (
+            <form onSubmit={registrar}>
+              <h4>Registrar anticipo</h4>
+              <div className="medidas-rejilla">
+                <label>
+                  Monto ($)
+                  <input
+                    inputMode="numeric"
+                    value={monto}
+                    onChange={(e) => setMonto(soloDigitos(e.target.value))}
+                    required
+                  />
+                </label>
+                <label>
+                  Cómo pagó
+                  <select value={metodo} onChange={(e) => setMetodo(e.target.value)}>
+                    <option value="efectivo">Efectivo</option>
+                    <option value="transferencia">Transferencia</option>
+                  </select>
+                </label>
+                <label>
+                  Fecha (vacío = hoy)
+                  <input type="date" value={fechaPago} onChange={(e) => setFechaPago(e.target.value)} />
+                </label>
+                <label>
+                  Nota (opcional)
+                  <input value={nota} onChange={(e) => setNota(e.target.value)} />
+                </label>
+              </div>
+              <div className="acciones">
+                <button type="submit" disabled={guardando}>
+                  {guardando ? "Guardando..." : "Registrar anticipo"}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <p className="nota">
+              No se registran más anticipos: el pedido está entregado o cancelado, o ya no tiene saldo.
+            </p>
+          )}
+          {mensaje && <p className="error">{mensaje}</p>}
+        </>
+      )}
+    </div>
+  );
+}
 function ListaPedidos({ alExpirar }) {
   const { datos, error, recargar } = useAdmin("/pedidos", alExpirar);
   const [mensaje, setMensaje] = useState("");
+
+    const [abierto, setAbierto] = useState(null);
 
   async function cambiar(id, estado) {
     setMensaje("");
@@ -704,6 +870,39 @@ function ListaPedidos({ alExpirar }) {
   return (
     <div>
       {mensaje && <p className="error">{mensaje}</p>}
+      {abierto !== null && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.4)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+            zIndex: 50,
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 10,
+              padding: 20,
+              width: "100%",
+              maxWidth: 620,
+              maxHeight: "90vh",
+              overflowY: "auto",
+            }}
+          >
+            <PagosPedido
+              pedido={abierto}
+              alCerrar={() => setAbierto(null)}
+              alExpirar={alExpirar}
+              alCambiar={recargar}
+            />
+          </div>
+        </div>
+      )}
       <div className="tabla-contenedor">
         <table className="tabla">
           <thead>
@@ -712,6 +911,8 @@ function ListaPedidos({ alExpirar }) {
               <th>Cliente</th>
               <th>Pedido</th>
               <th>Total</th>
+              <th>Pagado</th>
+              <th>Saldo</th>
               <th>Estado</th>
               <th>Acciones</th>
             </tr>
@@ -729,6 +930,21 @@ function ListaPedidos({ alExpirar }) {
                 </td>
                 <td>{p.detalle}</td>
                 <td>{dinero(p.total)}</td>
+                <td>
+                  {dinero(p.pagado)}
+                  <div>
+                    <button type="button" className="secundario" onClick={() => setAbierto(p)}>
+                      Pagos
+                    </button>
+                  </div>
+                </td>
+                <td>
+                  {p.saldo > 0 ? (
+                    dinero(p.saldo)
+                  ) : (
+                    <span className="estado estado-cotizada">Pagado</span>
+                  )}
+                </td>
                 <td>
                   <span className={`estado ${CLASE_PEDIDO[p.estado]}`}>
                     {ESTADOS_PEDIDO[p.estado]}
