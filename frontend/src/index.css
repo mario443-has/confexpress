@@ -182,3 +182,8 @@ button.secundario:hover:not(:disabled), .pestanas button:not(.activa):hover:not(
 .estado-talla.listo { background: #d8f3dc; color: #1b7f3b; }
 .estado-talla.encargo { background: #fff3cd; color: #7a5b00; }
 .precio-aprox { font-size: 1.05rem; color: #0b4d64; font-weight: 700; }
+
+/* Carrito: botón y marquilla en las tarjetas de prenda */
+.marquilla-opcion { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.marquilla-nombre { margin-top: 6px; width: 100%; box-sizing: border-box; }
+.agregar-solicitud { margin-top: 10px; width: 100%; }

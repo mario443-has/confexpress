@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { urlImagen } from "./api.js";
+import { agregarAlCarrito } from "./carrito.js";
 
 // Precio aproximado de la marquilla personalizada, por prenda.
 const PRECIO_MARQUILLA = 3000;
@@ -105,10 +106,42 @@ function textoPlazo(dias) {
   return ` · aprox. ${dias} ${dias === 1 ? "día" : "días"}`;
 }
 
-function TarjetaPrenda({ prenda: p }) {
+function TarjetaPrenda({ prenda: p, colegio }) {
   const [talla, setTalla] = useState("");
+  const [conMarquilla, setConMarquilla] = useState(false);
+  const [nombreMarquilla, setNombreMarquilla] = useState("");
+  const [aviso, setAviso] = useState(null);
   const seleccion = p.tallas.find((t) => t.talla === talla);
   const foto = p.imagenes[0];
+
+  function agregar() {
+    if (p.tallas.length > 0 && !seleccion) {
+      setAviso({ error: true, texto: "Elige una talla antes de agregar." });
+      return;
+    }
+    if (conMarquilla && !nombreMarquilla.trim()) {
+      setAviso({ error: true, texto: "Escribe el nombre que irá en la marquilla." });
+      return;
+    }
+    const listo = !p.a_medida && Boolean(seleccion) && seleccion.cantidad > 0 && !conMarquilla;
+    const resultado = agregarAlCarrito({
+      producto_id: p.id,
+      nombre: p.nombre,
+      colegio: colegio || "",
+      talla: seleccion ? seleccion.talla : "",
+      cantidad: 1,
+      con_marquilla: conMarquilla,
+      nombre_marquilla: conMarquilla ? nombreMarquilla.trim() : "",
+      precio: seleccion ? seleccion.precio : p.precio_referencia,
+      dias_encargo: p.dias_encargo,
+      listo,
+    });
+    setAviso(
+      resultado.ok
+        ? { error: false, texto: "Agregada a tu solicitud." }
+        : { error: true, texto: resultado.error }
+    );
+  }
   const precios = p.tallas.map((t) => t.precio);
   const desde = precios.length > 0 ? Math.min(...precios) : p.precio_referencia;
 
@@ -117,7 +150,7 @@ function TarjetaPrenda({ prenda: p }) {
     estado = { clase: "encargo", texto: `Por encargo · a la medida${textoPlazo(p.dias_encargo)}` };
   } else if (seleccion) {
     estado =
-      seleccion.cantidad > 0
+      seleccion.cantidad > 0 && !conMarquilla
         ? { clase: "listo", texto: "Listo para entregar" }
         : { clase: "encargo", texto: `Por encargo${textoPlazo(p.dias_encargo)}` };
   }
@@ -178,6 +211,29 @@ function TarjetaPrenda({ prenda: p }) {
           Admite marquilla personalizada (aprox. {pesos(PRECIO_MARQUILLA)} por prenda, siempre por encargo).
         </p>
       )}
+    {p.admite_marquilla && (
+      <label className="marquilla-opcion">
+        <input
+          type="checkbox"
+          checked={conMarquilla}
+          onChange={(e) => setConMarquilla(e.target.checked)}
+        />
+        <span>Con marquilla personalizada</span>
+      </label>
+    )}
+    {p.admite_marquilla && conMarquilla && (
+      <input
+        className="marquilla-nombre"
+        value={nombreMarquilla}
+        maxLength={40}
+        onChange={(e) => setNombreMarquilla(e.target.value)}
+        placeholder="Nombre que irá en la marquilla"
+      />
+    )}
+    <button type="button" className="agregar-solicitud" onClick={agregar}>
+      Agregar a mi solicitud
+    </button>
+    {aviso && <p className={aviso.error ? "error" : "exito"}>{aviso.texto}</p>}
     </article>
   );
 }
@@ -235,7 +291,7 @@ export function VistaColegio({ id }) {
           <h3 className="subtitulo">{g.titulo}</h3>
           <div className="rejilla">
             {g.lista.map((p) => (
-              <TarjetaPrenda key={p.id} prenda={p} />
+              <TarjetaPrenda key={p.id} prenda={p} colegio={datos.nombre} />
             ))}
           </div>
         </div>
