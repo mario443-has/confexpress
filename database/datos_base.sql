@@ -1,0 +1,27 @@
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!50503 SET NAMES utf8mb4 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+INSERT INTO `configuracion` VALUES ('precio_marquilla','3000','2026-11-15 03:19:07');
+
+INSERT INTO `tipos_prenda` VALUES (2,'Blusa'),(5,'Chaqueta'),(3,'Falda'),(4,'Jardinera'),(1,'Pantalón');
+
+INSERT INTO `medidas_prenda` VALUES (1,2,'Talle',1),(2,2,'Largo blusa',2),(3,2,'Largo manga',3),(4,2,'Cintura',4),(5,2,'Cadera',5),(6,2,'Busto',6),(7,2,'Espalda',7),(8,5,'Cintura',1),(9,5,'Cadera',2),(10,5,'Busto',3),(11,5,'Espalda',4),(12,5,'Largo total',5),(13,5,'Largo manga',6),(14,3,'Cintura',1),(15,3,'Cadera',2),(16,3,'Largo falda',3),(17,4,'Cintura',1),(18,4,'Cadera',2),(19,4,'Largo falda',3),(20,4,'Busto',4),(21,4,'Talle',5),(22,1,'Largo pantalón',1),(23,1,'Cintura',2),(24,1,'Cadera',3),(25,1,'Pierna',4),(26,1,'Largo rodilla',5),(27,1,'Rodilla',6),(28,1,'Bota',7);
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+
