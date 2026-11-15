@@ -22,6 +22,8 @@ function validar(cuerpo) {
     throw new ErrorValidacion("El género no es válido.");
   }
   const admiteMarquilla = cuerpo.admite_marquilla === true ? 1 : 0;
+  // null = el panel no lo envio: se conserva el valor guardado.
+  const precioAproximado = typeof cuerpo.precio_aproximado === "boolean" ? (cuerpo.precio_aproximado ? 1 : 0) : null;
   const dias =
     cuerpo.dias_encargo === "" || cuerpo.dias_encargo === null || cuerpo.dias_encargo === undefined
       ? null
@@ -61,13 +63,13 @@ function validar(cuerpo) {
     colegios.push({ colegioId, esOpcional: c.es_opcional === true ? 1 : 0 });
   }
 
-  return { linea, genero, admiteMarquilla, dias, tallas, colegios };
+  return { linea, genero, admiteMarquilla, precioAproximado, dias, tallas, colegios };
 }
 
 router.get("/prendas", async (_req, res) => {
   try {
     const [productos] = await pool.query(
-      "SELECT id, linea, genero, admite_marquilla, dias_encargo FROM productos"
+      "SELECT id, linea, genero, admite_marquilla, precio_aproximado, dias_encargo FROM productos"
     );
     const [tallas] = await pool.query(
       "SELECT producto_id, talla, precio, cantidad FROM producto_tallas ORDER BY producto_id, id"
@@ -81,6 +83,7 @@ router.get("/prendas", async (_req, res) => {
         linea: p.linea,
         genero: p.genero,
         admite_marquilla: Boolean(p.admite_marquilla),
+        precio_aproximado: Boolean(p.precio_aproximado),
         dias_encargo: p.dias_encargo,
         tallas: tallas
           .filter((t) => t.producto_id === p.id)
@@ -118,8 +121,8 @@ router.put("/prendas/:id", async (req, res) => {
       return res.status(404).json({ error: "El producto no existe." });
     }
     await conexion.query(
-      "UPDATE productos SET linea = ?, genero = ?, admite_marquilla = ?, dias_encargo = ? WHERE id = ?",
-      [datos.linea, datos.genero, datos.admiteMarquilla, datos.dias, id]
+      "UPDATE productos SET linea = ?, genero = ?, admite_marquilla = ?, dias_encargo = ?, precio_aproximado = COALESCE(?, precio_aproximado) WHERE id = ?",
+      [datos.linea, datos.genero, datos.admiteMarquilla, datos.dias, datos.precioAproximado, id]
     );
     await conexion.query("DELETE FROM producto_tallas WHERE producto_id = ?", [id]);
     for (const t of datos.tallas) {

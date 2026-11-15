@@ -5,6 +5,7 @@ import { pool } from "./db.js";
 import productosRouter from "./routes/productos.js";
 import solicitudesRouter from "./routes/solicitudes.js";
 import colegiosPublicoRouter from "./routes/colegiosPublico.js";
+import configuracionRouter from "./routes/configuracion.js";
 import adminRouter from "./routes/admin.js";
 
 dotenv.config();
@@ -27,6 +28,7 @@ app.get("/api/salud", async (req, res) => {
 app.use("/api/productos", productosRouter);
 app.use("/api/solicitudes", solicitudesRouter);
 app.use("/api/colegios", colegiosPublicoRouter);
+app.use("/api/configuracion", configuracionRouter);
 app.use("/api/admin", adminRouter);
 
 const PORT = process.env.PORT || 3001;

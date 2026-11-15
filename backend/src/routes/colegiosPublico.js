@@ -50,7 +50,7 @@ router.get("/:id", async (req, res) => {
     }
     const [prendas] = await pool.query(
       `SELECT p.id, p.nombre, p.descripcion, p.linea, p.genero, p.a_medida,
-              p.admite_marquilla, p.dias_encargo, p.precio_referencia, cp.es_opcional
+              p.admite_marquilla, p.dias_encargo, p.precio_referencia, p.precio_aproximado, cp.es_opcional
        FROM colegio_productos cp
        JOIN productos p ON p.id = cp.producto_id
        WHERE cp.colegio_id = ? AND p.activo = 1
@@ -82,6 +82,7 @@ router.get("/:id", async (req, res) => {
         admite_marquilla: Boolean(p.admite_marquilla),
         dias_encargo: p.dias_encargo,
         precio_referencia: p.precio_referencia === null ? null : Number(p.precio_referencia),
+        precio_aproximado: Boolean(p.precio_aproximado),
         es_opcional: Boolean(p.es_opcional),
         imagenes: imagenes
           .filter((i) => i.producto_id === p.id)
