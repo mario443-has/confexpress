@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { borrarToken, guardarToken, llamarAdmin, obtenerToken } from "./api.js";
 import FormularioSolicitud from "./FormularioSolicitud.jsx";
+import ConfirmarCatalogo from "./ConfirmarCatalogo.jsx";
 import AdminCatalogo from "./AdminCatalogo.jsx";
 import AdminColegios from "./AdminColegios.jsx";
 import { NOMBRE_NEGOCIO } from "./config.js";
@@ -230,6 +231,7 @@ function DetalleSolicitud({ id, alVolver, alExpirar }) {
           )}
 
           <h3>Cotización</h3>
+          <ConfirmarCatalogo solicitudId={datos.id} alExpirar={alExpirar} alCambiar={recargar} />
           <Cotizaciones solicitud={datos} alExpirar={alExpirar} alCambiar={recargar} />
 
           <h3>Cambiar estado</h3>

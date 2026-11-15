@@ -7,6 +7,7 @@ import cotizacionesRouter from "./cotizaciones.js";
 import pedidosRouter from "./pedidos.js";
 import colegiosRouter from "./colegios.js";
 import prendasRouter from "./prendas.js";
+import confirmarCatalogoRouter from "./confirmarCatalogo.js";
 import { configuracionAdminRouter } from "./configuracion.js";
 import catalogoRouter from "./catalogo.js";
 
@@ -128,6 +129,7 @@ router.use(cotizacionesRouter);
 router.use(pedidosRouter);
 router.use(colegiosRouter);
 router.use(prendasRouter);
+router.use(confirmarCatalogoRouter);
 router.use(configuracionAdminRouter);
 
 router.get("/clientes", async (req, res) => {

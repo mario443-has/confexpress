@@ -387,9 +387,10 @@ export default function AdminCatalogo({ alExpirar }) {
         </div>
 
         <div className="grupo">
-          <label htmlFor="catalogo-modalidad">Modalidad</label>
+          <label htmlFor="catalogo-modalidad">Modalidad · con tallas, la disponibilidad sale de la columna Listas</label>
           <select
             id="catalogo-modalidad"
+            disabled={extras.tallas.length > 0}
             name="modalidad"
             value={formulario.modalidad}
             onChange={cambiarCampo}

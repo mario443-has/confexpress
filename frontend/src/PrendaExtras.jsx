@@ -97,7 +97,7 @@ export default function PrendaExtras({ extras, setExtras, colegios, aMedida }) {
               <tr>
                 <th>Talla</th>
                 <th>Precio ($)</th>
-                <th>Listas</th>
+                <th>Listas (0 = por encargo)</th>
                 <th></th>
               </tr>
             </thead>
