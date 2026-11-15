@@ -21,6 +21,22 @@ export function validar(body, { permitirMedidas = false } = {}) {
   if (body.autoriza_datos !== true) {
     return { error: "Debe autorizarse el tratamiento de los datos personales para registrar la solicitud." };
   }
+  const fechaTexto = String(body.fecha_requerida ?? "").trim();
+  let fechaRequerida = null;
+  if (fechaTexto) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(fechaTexto);
+    const f = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;
+    const valida = f && f.getFullYear() === Number(m[1]) && f.getMonth() === Number(m[2]) - 1 && f.getDate() === Number(m[3]);
+    if (!valida) {
+      return { error: "La fecha en que necesitas el pedido no es válida." };
+    }
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    if (f < hoy) {
+      return { error: "La fecha en que necesitas el pedido no puede ser anterior a hoy." };
+    }
+    fechaRequerida = fechaTexto;
+  }
   if (!Array.isArray(body.items) || body.items.length === 0 || body.items.length > 20) {
     return { error: "Agrega entre 1 y 20 productos o servicios." };
   }
@@ -32,6 +48,7 @@ export function validar(body, { permitirMedidas = false } = {}) {
     const cantidad = Number(it.cantidad);
     const talla = String(it.talla ?? "").trim();
     const especificaciones = String(it.especificaciones ?? "").trim();
+    const conMarquilla = it.con_marquilla === true;
     const vacio = it.producto_id === null || it.producto_id === undefined || it.producto_id === "";
     const productoId = vacio ? null : Number(it.producto_id);
 
@@ -80,6 +97,7 @@ export function validar(body, { permitirMedidas = false } = {}) {
       cantidad,
       talla: talla || null,
       especificaciones: especificaciones || null,
+      conMarquilla,
       prendas,
     });
   }
@@ -90,6 +108,7 @@ export function validar(body, { permitirMedidas = false } = {}) {
       telefono,
       correo: correo || null,
       observaciones: observaciones || null,
+      fechaRequerida,
       items,
     },
   };
@@ -155,15 +174,15 @@ export async function crearSolicitud(datos, origen) {
     }
 
     const [solicitud] = await conexion.query(
-      "INSERT INTO solicitudes (cliente_id, origen, observaciones, autorizacion_datos_en) VALUES (?, ?, ?, NOW())",
-      [clienteId, origen, datos.observaciones]
+      "INSERT INTO solicitudes (cliente_id, origen, observaciones, fecha_requerida, autorizacion_datos_en) VALUES (?, ?, ?, ?, NOW())",
+      [clienteId, origen, datos.observaciones, datos.fechaRequerida]
     );
     const solicitudId = solicitud.insertId;
 
     for (const it of datos.items) {
       const [detalle] = await conexion.query(
-        "INSERT INTO detalles_solicitud (solicitud_id, producto_id, descripcion_solicitada, cantidad, talla, especificaciones) VALUES (?, ?, ?, ?, ?, ?)",
-        [solicitudId, it.productoId, it.descripcion, it.cantidad, it.talla, it.especificaciones]
+        "INSERT INTO detalles_solicitud (solicitud_id, producto_id, descripcion_solicitada, cantidad, talla, especificaciones, con_marquilla) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        [solicitudId, it.productoId, it.descripcion, it.cantidad, it.talla, it.especificaciones, it.conMarquilla ? 1 : 0]
       );
       if (it.prendas && it.prendas.length > 0) {
         await guardarMedidas(conexion, detalle.insertId, it.productoId, it.prendas);
