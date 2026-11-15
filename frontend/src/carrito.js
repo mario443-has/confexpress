@@ -109,3 +109,46 @@ export function useCarrito() {
   }, []);
   return lista;
 }
+
+// Precio de la marquilla personalizada: lo define el administrador en el panel.
+// Se pide una sola vez por visita a la pagina y se comparte entre los componentes.
+let precioMarquillaCache = null;
+let precioMarquillaPromesa = null;
+
+export function usePrecioMarquilla() {
+  const [precio, setPrecio] = useState(precioMarquillaCache);
+  useEffect(() => {
+    if (!precioMarquillaPromesa) {
+      precioMarquillaPromesa = fetch("/api/configuracion")
+        .then((res) => (res.ok ? res.json() : null))
+        .then((datos) => {
+          const n = datos ? Number(datos.precio_marquilla) : NaN;
+          if (Number.isFinite(n)) precioMarquillaCache = n;
+        })
+        .catch(() => {});
+    }
+    precioMarquillaPromesa.then(() => setPrecio(precioMarquillaCache));
+  }, []);
+  return precio;
+}
+
+// Separa lo que tiene precio final de lo aproximado. La marquilla siempre es precio final.
+// Una prenda sin precio (o guardada antes de existir este dato) cuenta como aproximada.
+export function resumenPrecios(lista, precioMarquilla) {
+  const marquilla = Number(precioMarquilla) || 0;
+  let fijo = 0;
+  let aproximado = 0;
+  let sinPrecio = false;
+  for (const i of lista) {
+    const cantidad = Number(i.cantidad) || 0;
+    if (i.con_marquilla) fijo += marquilla * cantidad;
+    if (i.precio === null || i.precio === undefined || i.precio === "") {
+      sinPrecio = true;
+      continue;
+    }
+    const subtotal = Number(i.precio) * cantidad;
+    if (i.precio_aproximado === false) fijo += subtotal;
+    else aproximado += subtotal;
+  }
+  return { fijo, aproximado, sinPrecio, todoFinal: lista.length > 0 && aproximado === 0 && !sinPrecio };
+}

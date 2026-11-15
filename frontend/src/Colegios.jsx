@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { urlImagen } from "./api.js";
-import { agregarAlCarrito } from "./carrito.js";
+import { agregarAlCarrito, usePrecioMarquilla } from "./carrito.js";
 
-// Precio aproximado de la marquilla personalizada, por prenda.
-const PRECIO_MARQUILLA = 3000;
+// El precio de la marquilla lo define el administrador en el panel (se lee de /api/configuracion).
+
 
 const GENEROS = { nino: "Niños", nina: "Niñas", todos: "Niños y niñas" };
 
@@ -111,6 +111,8 @@ function TarjetaPrenda({ prenda: p, colegio }) {
   const [conMarquilla, setConMarquilla] = useState(false);
   const [nombreMarquilla, setNombreMarquilla] = useState("");
   const [aviso, setAviso] = useState(null);
+  const precioMarquilla = usePrecioMarquilla();
+  const sufijo = p.precio_aproximado !== false ? " aprox." : "";
   const seleccion = p.tallas.find((t) => t.talla === talla);
   const foto = p.imagenes[0];
 
@@ -133,6 +135,7 @@ function TarjetaPrenda({ prenda: p, colegio }) {
       con_marquilla: conMarquilla,
       nombre_marquilla: conMarquilla ? nombreMarquilla.trim() : "",
       precio: seleccion ? seleccion.precio : p.precio_referencia,
+      precio_aproximado: p.precio_aproximado !== false,
       dias_encargo: p.dias_encargo,
       listo,
     });
@@ -195,9 +198,9 @@ function TarjetaPrenda({ prenda: p, colegio }) {
 
       <div>
         {seleccion ? (
-          <span className="precio-aprox">{pesos(seleccion.precio)} aprox.</span>
+          <span className="precio-aprox">{pesos(seleccion.precio)}{sufijo}</span>
         ) : desde !== null && desde !== undefined ? (
-          <span className="precio-aprox">Desde {pesos(desde)}</span>
+          <span className="precio-aprox">{p.tallas.length > 1 ? "Desde " : ""}{pesos(desde)}{sufijo}</span>
         ) : (
           <span className="precio-aprox">Cotizar</span>
         )}
@@ -208,7 +211,7 @@ function TarjetaPrenda({ prenda: p, colegio }) {
       {p.a_medida && <p className="nota">Las medidas se toman en persona.</p>}
       {p.admite_marquilla && (
         <p className="nota">
-          Admite marquilla personalizada (aprox. {pesos(PRECIO_MARQUILLA)} por prenda, siempre por encargo).
+          Admite marquilla personalizada ({precioMarquilla !== null ? pesos(precioMarquilla) + " " : ""}por prenda, siempre por encargo).
         </p>
       )}
     {p.admite_marquilla && (
@@ -298,7 +301,11 @@ export function VistaColegio({ id }) {
       ))}
 
       <p className="aviso" style={{ marginTop: 24 }}>
-        Los precios son aproximados y se confirman en la cotización. La disponibilidad la confirma
+        {datos.prendas.every((p) => p.precio_aproximado !== false)
+          ? "Los precios son aproximados y se confirman en la cotización. "
+          : datos.prendas.some((p) => p.precio_aproximado !== false)
+          ? "Los precios marcados como aprox. se confirman en la cotización; los demás son precios finales. "
+          : "Los precios son finales. "}La disponibilidad la confirma
         E &amp; M Confecciones al recibir tu solicitud.
       </p>
     </section>
