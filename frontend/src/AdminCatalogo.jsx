@@ -1,5 +1,34 @@
 import { useEffect, useState } from "react";
 import { llamarAdmin } from "./api.js";
+import PrendaExtras from "./PrendaExtras.jsx";
+
+const EXTRAS_VACIOS = {
+  linea: "",
+  genero: "",
+  admite_marquilla: false,
+  dias_encargo: "",
+  tallas: [],
+  colegios: [],
+};
+
+function extrasDe(p) {
+  if (!p) return EXTRAS_VACIOS;
+  return {
+    linea: p.linea ?? "",
+    genero: p.genero ?? "",
+    admite_marquilla: Boolean(p.admite_marquilla),
+    dias_encargo: p.dias_encargo ?? "",
+    tallas: p.tallas.map((t) => ({
+      talla: t.talla,
+      precio: String(t.precio),
+      cantidad: String(t.cantidad),
+    })),
+    colegios: p.colegios.map((c) => ({
+      colegio_id: c.colegio_id,
+      es_opcional: Boolean(c.es_opcional),
+    })),
+  };
+}
 
 const FORMULARIO_VACIO = {
   nombre: "",
@@ -33,6 +62,13 @@ export default function AdminCatalogo({ alExpirar }) {
   const [mensaje, setMensaje] = useState("");
   const [imagenEdicion, setImagenEdicion] = useState({});
   const [productoModalId, setProductoModalId] = useState(null);
+  const [extras, setExtras] = useState(EXTRAS_VACIOS);
+  const [colegios, setColegios] = useState([]);
+  const [prendas, setPrendas] = useState({});
+
+  useEffect(() => {
+    if (editando === null) setExtras(EXTRAS_VACIOS);
+  }, [editando]);
 
   async function cargarProductos(silencioso = false) {
     if (!silencioso) setCargando(true);
@@ -40,6 +76,9 @@ export default function AdminCatalogo({ alExpirar }) {
     try {
       const datos = await llamarAdmin("/catalogo");
       setProductos(Array.isArray(datos) ? datos : []);
+      const datosPrendas = await llamarAdmin("/prendas");
+      setPrendas(Object.fromEntries(datosPrendas.map((p) => [p.id, p])));
+      setColegios(await llamarAdmin("/colegios"));
     } catch (e) {
       if (e.estado === 401) {
         alExpirar?.();
@@ -86,6 +125,7 @@ export default function AdminCatalogo({ alExpirar }) {
 
   function prepararEdicion(producto) {
     setEditando(producto.id);
+    setExtras(extrasDe(prendas[producto.id]));
     setFormulario({
       nombre: producto.nombre || "",
       descripcion: producto.descripcion || "",
@@ -145,6 +185,20 @@ export default function AdminCatalogo({ alExpirar }) {
 
       productoGuardado = true;
       const idProducto = editando || respuesta.id;
+
+      try {
+        await llamarAdmin(`/prendas/${idProducto}`, {
+          method: "PUT",
+          body: JSON.stringify(extras),
+        });
+      } catch (errExtras) {
+        if (errExtras.estado === 401) throw errExtras;
+        productoGuardado = false;
+        cargarProductos(true);
+        throw new Error(
+          `El producto se guardó, pero no se pudieron guardar las tallas y los colegios: ${errExtras.message}`
+        );
+      }
 
       if (archivos.length && idProducto) {
         const formData = new FormData();
@@ -374,6 +428,14 @@ export default function AdminCatalogo({ alExpirar }) {
         </div>
 
         <div className="grupo">
+          <PrendaExtras
+            extras={extras}
+            setExtras={setExtras}
+            colegios={colegios}
+            aMedida={formulario.a_medida}
+          />
+        </div>
+        <div className="grupo">
           <label htmlFor="catalogo-imagenes">
             Imágenes {editando ? "(puedes agregar más)" : "(puedes cargarlas después de crear)"}
           </label>
@@ -425,6 +487,21 @@ export default function AdminCatalogo({ alExpirar }) {
                 </p>
                 <p>{dinero(producto.precio_referencia)}</p>
                 {producto.descripcion && <p>{producto.descripcion}</p>}
+                {prendas[producto.id] && (
+                  <p className="nota">
+                    {prendas[producto.id].linea ? `${prendas[producto.id].linea} · ` : ""}
+                    {prendas[producto.id].tallas.length} talla(s) · Colegios:{" "}
+                    {prendas[producto.id].colegios.length === 0
+                      ? "ninguno"
+                      : prendas[producto.id].colegios
+                          .map(
+                            (c) =>
+                              (colegios.find((x) => x.id === c.colegio_id)?.nombre ?? "?") +
+                              (c.es_opcional ? " (opcional)" : "")
+                          )
+                          .join(", ")}
+                  </p>
+                )}
                 <p className="nota">
                   {producto.modalidad?.replaceAll("_", " ")}
                   {Boolean(Number(producto.a_medida)) ? " · A medida" : ""}

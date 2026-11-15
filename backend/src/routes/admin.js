@@ -6,6 +6,7 @@ import medidasRouter from "./medidas.js";
 import cotizacionesRouter from "./cotizaciones.js";
 import pedidosRouter from "./pedidos.js";
 import colegiosRouter from "./colegios.js";
+import prendasRouter from "./prendas.js";
 import catalogoRouter from "./catalogo.js";
 
 const router = Router();
@@ -125,6 +126,7 @@ router.use(medidasRouter);
 router.use(cotizacionesRouter);
 router.use(pedidosRouter);
 router.use(colegiosRouter);
+router.use(prendasRouter);
 
 router.get("/clientes", async (req, res) => {
   try {
