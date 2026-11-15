@@ -2,6 +2,7 @@ import { useState } from "react";
 import { NOMBRE_NEGOCIO, WHATSAPP_NUMERO } from "./config.js";
 import { obtenerToken } from "./api.js";
 import EditorMedidas from "./EditorMedidas.jsx";
+import { useCarrito, cambiarCantidad, quitarDelCarrito, vaciarCarrito, plazoEstimadoDias, itemsParaSolicitud } from "./carrito.js";
 
 const ITEM_VACIO = {
   tipos: [],
@@ -15,6 +16,9 @@ const ITEM_VACIO = {
 
 export default function FormularioSolicitud({ productos, modoAdmin = false, medidas = null }) {
   const [origen, setOrigen] = useState("presencial");
+  const carrito = useCarrito();
+  // El carrito solo se usa en el formulario público, no en el modo del panel.
+  const usaCarrito = !modoAdmin && carrito.length > 0;
 
   function prendasDelItem(it) {
     if (!medidas) return [];
@@ -40,6 +44,21 @@ export default function FormularioSolicitud({ productos, modoAdmin = false, medi
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState("");
   const [exito, setExito] = useState(null);
+  const [fechaRequerida, setFechaRequerida] = useState("");
+
+  const ahora = new Date();
+  const hoy = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, "0")}-${String(ahora.getDate()).padStart(2, "0")}`;
+  const plazo = usaCarrito ? plazoEstimadoDias(carrito) : null;
+  let avisoPlazo = "";
+  if (fechaRequerida && plazo !== null) {
+    const limite = new Date();
+    limite.setHours(0, 0, 0, 0);
+    limite.setDate(limite.getDate() + plazo);
+    const [a, m, d] = fechaRequerida.split("-").map(Number);
+    if (new Date(a, m - 1, d) < limite) {
+      avisoPlazo = `Algunas prendas son por encargo y tardan aprox. ${plazo} ${plazo === 1 ? "día" : "días"}. Puede que no alcancen para esa fecha; el negocio lo confirmará contigo.`;
+    }
+  }
 
   const hayAMedida = items.some((it) => {
     const p = productos.find((x) => String(x.id) === String(it.producto_id));
@@ -82,6 +101,8 @@ export default function FormularioSolicitud({ productos, modoAdmin = false, medi
     setError("");
     setExito(null);
     setEnviando(true);
+    const manuales = items.filter((it) => !usaCarrito || it.descripcion.trim());
+    const todosLosItems = [...(usaCarrito ? itemsParaSolicitud(carrito) : []), ...manuales];
     try {
       const res = await fetch(endpoint, {
         method: "POST",
@@ -90,8 +111,9 @@ export default function FormularioSolicitud({ productos, modoAdmin = false, medi
           ...cliente,
           observaciones,
           autoriza_datos: autoriza,
+          ...(fechaRequerida && !modoAdmin ? { fecha_requerida: fechaRequerida } : {}),
           ...(modoAdmin ? { origen } : {}),
-          items: items.map((it) => ({
+          items: todosLosItems.map((it) => ({
             ...it,
             producto_id: it.producto_id ? Number(it.producto_id) : null,
             cantidad: Number(it.cantidad),
@@ -105,6 +127,8 @@ export default function FormularioSolicitud({ productos, modoAdmin = false, medi
       setCliente({ nombre: "", telefono: "", correo: "" });
       setObservaciones("");
       setItems([{ ...ITEM_VACIO }]);
+      setFechaRequerida("");
+      if (usaCarrito) vaciarCarrito();
       setAutoriza(false);
     } catch (err) {
       setError(err.message);
@@ -153,7 +177,41 @@ export default function FormularioSolicitud({ productos, modoAdmin = false, medi
           </div>
         </div>
 
-        <h3>Qué necesitas</h3>
+        {usaCarrito && (
+          <div className="carrito-solicitud">
+            <h3>Tu solicitud</h3>
+            {carrito.map((i) => (
+              <div key={i.clave} className="carrito-linea">
+                <div className="carrito-info">
+                  <strong>{i.nombre}</strong>
+                  <span className="nota">
+                    {[i.colegio, i.talla ? `Talla ${i.talla}` : "", i.con_marquilla ? `Marquilla: ${i.nombre_marquilla}` : ""]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
+                  <span className="nota">
+                    {i.listo ? "Listo para entregar" : "Por encargo"}
+                    {i.precio ? ` · $${Number(i.precio).toLocaleString("es-CO")} aprox. c/u` : " · Cotizar"}
+                  </span>
+                </div>
+                <input
+                  type="number"
+                  min="1"
+                  max="10000"
+                  value={i.cantidad}
+                  aria-label={`Cantidad de ${i.nombre}`}
+                  onChange={(e) => cambiarCantidad(i.clave, e.target.value)}
+                />
+                <button type="button" className="secundario" onClick={() => quitarDelCarrito(i.clave)}>
+                  Quitar
+                </button>
+              </div>
+            ))}
+            <p className="nota">Los precios son aproximados y se confirman en la cotización.</p>
+          </div>
+        )}
+
+        <h3>{usaCarrito ? "Otros productos o servicios (opcional)" : "Qué necesitas"}</h3>
         {items.map((it, i) => (
           <div key={i} className="item">
             <div className="fila">
@@ -176,7 +234,7 @@ export default function FormularioSolicitud({ productos, modoAdmin = false, medi
                 <input
                   value={it.descripcion}
                   onChange={(e) => cambiarItem(i, "descripcion", e.target.value)}
-                  required
+                  required={!usaCarrito || Boolean(it.talla.trim() || it.especificaciones.trim())}
                 />
               </div>
             </div>
@@ -254,6 +312,18 @@ export default function FormularioSolicitud({ productos, modoAdmin = false, medi
               <option value="presencial">En el local</option>
               <option value="whatsapp">Por WhatsApp</option>
             </select>
+          </div>
+        )}
+        {!modoAdmin && (
+          <div className="grupo">
+            <label>Fecha en que lo necesitas (opcional)</label>
+            <input
+              type="date"
+              value={fechaRequerida}
+              min={hoy}
+              onChange={(e) => setFechaRequerida(e.target.value)}
+            />
+            {avisoPlazo && <p className="aviso">{avisoPlazo}</p>}
           </div>
         )}
         <label className="autorizacion">

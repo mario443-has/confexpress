@@ -187,3 +187,9 @@ button.secundario:hover:not(:disabled), .pestanas button:not(.activa):hover:not(
 .marquilla-opcion { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
 .marquilla-nombre { margin-top: 6px; width: 100%; box-sizing: border-box; }
 .agregar-solicitud { margin-top: 10px; width: 100%; }
+
+/* Carrito: panel "Tu solicitud" en el formulario */
+.carrito-solicitud { margin-bottom: 16px; }
+.carrito-linea { display: flex; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid #e5e5e5; }
+.carrito-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.carrito-linea input[type="number"] { width: 72px; }
