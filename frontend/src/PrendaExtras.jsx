@@ -72,6 +72,15 @@ export default function PrendaExtras({ extras, setExtras, colegios, aMedida }) {
         Admite marquilla personalizada
       </label>
 
+      <label className="autorizacion">
+        <input
+          type="checkbox"
+          checked={extras.precio_aproximado !== false}
+          onChange={(e) => cambiar("precio_aproximado", e.target.checked)}
+        />
+        El precio es aproximado (se confirma en la cotización). Si lo desmarcas, la página lo muestra como precio final.
+      </label>
+
       <h4>Tallas</h4>
       {aMedida && (
         <p className="nota">

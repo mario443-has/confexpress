@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { llamarAdmin } from "./api.js";
 import PrendaExtras from "./PrendaExtras.jsx";
+import PrecioMarquilla from "./PrecioMarquilla.jsx";
 
 const EXTRAS_VACIOS = {
   linea: "",
   genero: "",
   admite_marquilla: false,
+  precio_aproximado: true,
   dias_encargo: "",
   tallas: [],
   colegios: [],
@@ -17,6 +19,7 @@ function extrasDe(p) {
     linea: p.linea ?? "",
     genero: p.genero ?? "",
     admite_marquilla: Boolean(p.admite_marquilla),
+    precio_aproximado: p.precio_aproximado !== false,
     dias_encargo: p.dias_encargo ?? "",
     tallas: p.tallas.map((t) => ({
       talla: t.talla,
@@ -325,6 +328,7 @@ export default function AdminCatalogo({ alExpirar }) {
   return (
     <section className="catalogo-admin">
       <h2>Administrar catálogo</h2>
+      <PrecioMarquilla />
       <p>Agrega productos o servicios, modifica sus datos y administra sus fotografías.</p>
 
       {error && <p className="error">{error}</p>}
