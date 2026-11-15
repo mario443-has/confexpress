@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import FormularioSolicitud from "./FormularioSolicitud.jsx";
 import Admin from "./Admin.jsx";
 import { urlImagen } from "./api.js";
+import { SeccionColegios, VistaColegio, useIdsEnColegios } from "./Colegios.jsx";
 
 const ETIQUETAS = {
   entrega_inmediata: "Entrega inmediata",
@@ -57,10 +58,11 @@ function TarjetaProducto({ producto: p }) {
     </article>
   );
 }
-function Catalogo() {
+function Catalogo({ colegioId }) {
   const [productos, setProductos] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
+  const ocultos = useIdsEnColegios();
 
   useEffect(() => {
     fetch("/api/productos")
@@ -85,9 +87,12 @@ function Catalogo() {
 
       {cargando && <p>Cargando catálogo...</p>}
       {error && <p className="error">{error}</p>}
+      {colegioId === null && <SeccionColegios />}
+      {colegioId !== null && <VistaColegio key={colegioId} id={colegioId} />}
 
-      <div className="rejilla">
-        {productos.map((p) => (
+      {colegioId === null && <h2 className="subtitulo">Otros productos y servicios</h2>}
+      <div className="rejilla" style={colegioId !== null ? { display: "none" } : undefined}>
+        {productos.filter((p) => !ocultos.has(p.id)).map((p) => (
           <TarjetaProducto key={p.id} producto={p} />
         ))}
       </div>
@@ -97,18 +102,27 @@ function Catalogo() {
   );
 }
 
+function colegioDeHash() {
+  const m = window.location.hash.match(/^#\/colegio\/(\d+)$/);
+  return m ? Number(m[1]) : null;
+}
+
 function esAdmin() {
   return window.location.hash.startsWith("#/admin");
 }
 
 export default function App() {
   const [admin, setAdmin] = useState(esAdmin());
+  const [colegioId, setColegioId] = useState(colegioDeHash());
 
   useEffect(() => {
-    const alCambiar = () => setAdmin(esAdmin());
+    const alCambiar = () => {
+      setAdmin(esAdmin());
+      setColegioId(colegioDeHash());
+    };
     window.addEventListener("hashchange", alCambiar);
     return () => window.removeEventListener("hashchange", alCambiar);
   }, []);
 
-  return admin ? <Admin /> : <Catalogo />;
+  return admin ? <Admin /> : <Catalogo colegioId={colegioId} />;
 }

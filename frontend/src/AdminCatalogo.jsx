@@ -159,7 +159,7 @@ export default function AdminCatalogo({ alExpirar }) {
     const datos = {
       ...formulario,
       precio_referencia:
-        formulario.precio_referencia === ""
+        (formulario.precio_referencia === "" || extras.tallas.length > 0)
           ? null
           : Number(formulario.precio_referencia),
       categoria: formulario.categoria.trim() || null,
@@ -367,9 +367,10 @@ export default function AdminCatalogo({ alExpirar }) {
             />
           </div>
           <div className="grupo">
-            <label htmlFor="catalogo-precio">Precio de referencia (COP)</label>
+            <label htmlFor="catalogo-precio">Precio de referencia (COP) · solo si la prenda no tiene tallas</label>
             <input
               id="catalogo-precio"
+              disabled={extras.tallas.length > 0}
               name="precio_referencia"
               type="number"
               min="0"

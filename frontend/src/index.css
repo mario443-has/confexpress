@@ -158,3 +158,27 @@ button.secundario:hover:not(:disabled), .pestanas button:not(.activa):hover:not(
   .logo { width: 64px; height: 64px; }
   .encabezado { padding: 18px 16px 14px; }
 }
+
+/* Colegios (catalogo publico) */
+.subtitulo { color: #083a4f; margin: 32px 0 12px; }
+.buscador-colegios { width: 100%; max-width: 420px; padding: 10px 12px; border: 1px solid #cbd2d9; border-radius: 8px; font: inherit; margin-bottom: 16px; box-sizing: border-box; }
+.rejilla-colegios { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
+.tarjeta-colegio { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; background: #fff; border-radius: 14px; padding: 18px 12px; text-decoration: none; color: #083a4f; font-weight: 600; box-shadow: 0 2px 8px rgba(8, 58, 79, 0.1); transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.tarjeta-colegio:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(8, 58, 79, 0.16); }
+.tarjeta-colegio .nota { font-weight: 400; }
+.escudo { border-radius: 50%; object-fit: contain; background: #fff; border: 1px solid #d9e2ec; flex: none; }
+.escudo-iniciales { display: flex; align-items: center; justify-content: center; background: #d9f0f0; color: #0b4d64; font-weight: 700; border-radius: 50%; flex: none; }
+.cabecera-colegio { display: flex; align-items: center; gap: 16px; background: #fff; border-radius: 16px; padding: 18px 22px; margin-bottom: 8px; box-shadow: 0 2px 10px rgba(8, 58, 79, 0.12); }
+.cabecera-colegio h2 { margin: 0; color: #083a4f; }
+.volver { display: inline-block; margin-bottom: 12px; color: #0b4d64; font-weight: 600; text-decoration: none; }
+.volver:hover { text-decoration: underline; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.chip { background: #fff; color: #0b4d64; border: 1px solid #92c9cb; border-radius: 16px; padding: 5px 12px; font-size: 0.85rem; }
+.chip.chip-listo { border-color: #1b7f3b; }
+.chip.chip-listo::after { content: " \2713"; color: #1b7f3b; }
+.chip.activa { background: #0b4d64; color: #fff; border-color: #0b4d64; }
+.chip.activa::after { color: #fff; }
+.estado-talla { display: inline-block; font-size: 0.8rem; font-weight: 600; padding: 3px 10px; border-radius: 12px; margin-top: 6px; }
+.estado-talla.listo { background: #d8f3dc; color: #1b7f3b; }
+.estado-talla.encargo { background: #fff3cd; color: #7a5b00; }
+.precio-aprox { font-size: 1.05rem; color: #0b4d64; font-weight: 700; }
