@@ -57,6 +57,10 @@ function cotizacion(detalleSolicitudId, precio) {
   };
 }
 
+if (!String(process.env.DB_NAME).endsWith("_prueba")) {
+  throw new Error("Esta prueba solo corre sobre una base cuyo nombre termine en _prueba (por ejemplo confexpress_prueba).");
+}
+
 const baseDeDatos = await mysql.createConnection({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -182,7 +186,34 @@ try {
   assert.ok(pedido);
   assert.equal(pedidos.filter((item) => item.solicitud_id === primeraSolicitud.id).length, 1);
 
+  const rutaPedido = `/api/admin/pedidos/${pedido.id}`;
+  const cambiarEstado = (estado) =>
+    llamar(`${rutaPedido}/estado`, { method: "PATCH", body: JSON.stringify({ estado }) }, token);
+  const pagarPedido = (monto, metodo = "efectivo") =>
+    llamar(`${rutaPedido}/pagos`, { method: "POST", body: JSON.stringify({ monto, metodo }) }, token);
+  const anularPago = (id) =>
+    llamar(`/api/admin/pagos/${id}/anular`, { method: "PATCH", body: JSON.stringify({ motivo: "prueba" }) }, token);
+  let primerPago;
+
   for (const estado of ["en_confeccion", "listo", "entregado"]) {
+    if (estado === "en_confeccion") {
+      // Esta línea no viene del catálogo: cuenta como confección y exige anticipo.
+      confirmar(await cambiarEstado("en_confeccion"), 409);
+      confirmar(await pagarPedido(0), 400);
+      confirmar(await pagarPedido(1500.5), 400);
+      confirmar(await pagarPedido(pedido.total + 1), 409);
+      primerPago = confirmar(await pagarPedido(40000), 201);
+      assert.equal(primerPago.saldo, pedido.total - 40000);
+    }
+    if (estado === "listo") {
+      const extra = confirmar(await pagarPedido(10000, "transferencia"), 201);
+      const tras = confirmar(await anularPago(extra.id), 200);
+      assert.equal(tras.pagado, 40000);
+    }
+    if (estado === "entregado") {
+      confirmar(await cambiarEstado("entregado"), 409);
+      confirmar(await pagarPedido(pedido.total - 40000), 201);
+    }
     confirmar(
       await llamar(
         `/api/admin/pedidos/${pedido.id}/estado`,
@@ -205,6 +236,54 @@ try {
   const pedidoFinal = pedidosFinales.find((item) => item.id === pedido.id);
   assert.equal(pedidoFinal.estado, "entregado");
   assert.ok(pedidoFinal.fecha_entrega_real);
+
+  confirmar(await anularPago(primerPago.id), 409);
+
+  // Arreglo del catálogo: no exige anticipo, pero tampoco se entrega con saldo.
+  const productosPublicos = confirmar(await llamar("/api/productos"), 200);
+  const servicio = productosPublicos.find((p) => p.tipo === "servicio");
+  assert.ok(servicio, "Falta un producto de tipo servicio (carga database/datos_demo.sql).");
+  const solicitudArreglo = confirmar(
+    await llamar("/api/solicitudes", {
+      method: "POST",
+      body: JSON.stringify({
+        ...solicitud(telefonoInternacional),
+        items: [{ producto_id: servicio.id, descripcion: "Arreglo de prueba", cantidad: 1 }],
+      }),
+    }),
+    201
+  );
+  const detalleArreglo = confirmar(
+    await llamar(`/api/admin/solicitudes/${solicitudArreglo.id}`, {}, token),
+    200
+  );
+  const cotizacionArreglo = confirmar(
+    await llamar(
+      `/api/admin/solicitudes/${solicitudArreglo.id}/cotizaciones`,
+      { method: "POST", body: JSON.stringify(cotizacion(detalleArreglo.items[0].id, 20000)) },
+      token
+    ),
+    201
+  );
+  const aceptadaArreglo = confirmar(
+    await llamar(
+      `/api/admin/cotizaciones/${cotizacionArreglo.id}/estado`,
+      { method: "PATCH", body: JSON.stringify({ estado: "aceptada" }) },
+      token
+    ),
+    200
+  );
+  const rutaArreglo = `/api/admin/pedidos/${aceptadaArreglo.pedido_id}`;
+  const estadoArreglo = (estado) =>
+    llamar(`${rutaArreglo}/estado`, { method: "PATCH", body: JSON.stringify({ estado }) }, token);
+  confirmar(await estadoArreglo("en_confeccion"), 200);
+  confirmar(await estadoArreglo("listo"), 200);
+  confirmar(await estadoArreglo("entregado"), 409);
+  confirmar(
+    await llamar(`${rutaArreglo}/pagos`, { method: "POST", body: JSON.stringify({ monto: 20000, metodo: "efectivo" }) }, token),
+    201
+  );
+  confirmar(await estadoArreglo("entregado"), 200);
 
   console.log("Flujo PMV completado correctamente.");
 } finally {
